@@ -4,7 +4,7 @@ import api from '../lib/axios';
 
 export const useConfigStore = defineStore('config', () => {
     const apiKeys = ref([]);
-    const activeModel = ref('gemini-2.1-flash');
+    const activeModel = ref('gemini-2.5-flash');
     const loading = ref(false);
 
     const fetchConfig = async () => {

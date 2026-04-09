@@ -41,8 +41,12 @@ export function getMimeType(file) {
  * @param {string} modelName - ID Model (mặc định gemini-2.1-flash hoặc gemini-2.0-flash-exp)
  * @param {function} onProgress - Callback tiến độ
  */
-export async function analyzeMeeting(audioBlob, apiKey, modelName = 'gemini-2.1-flash', onProgress = () => { }) {
-    try {
+export async function analyzeMeeting(audioBlob, apiKey, modelName = 'gemini-2.5-flash', onProgress = () => { }) {
+    let retries = 3;
+    let delay = 2000;
+
+    while (retries > 0) {
+        try {
         onProgress(10, 'Khởi tạo AI...');
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
@@ -108,16 +112,28 @@ export async function analyzeMeeting(audioBlob, apiKey, modelName = 'gemini-2.1-
         onProgress(100, 'Xong!');
         return JSON.parse(text);
     } catch (error) {
+        if (error.message?.includes('503') && retries > 1) {
+            retries--;
+            onProgress(50, `Hệ thống bận, đang thử lại lần ${3 - retries}...`);
+            await new Promise(r => setTimeout(r, delay));
+            delay *= 2;
+            continue;
+        }
         console.error('Gemini Analysis Error:', error);
         throw error;
+    }
     }
 }
 
 /**
  * Phân tích báo cáo văn bản (Note Analyzer)
  */
-export async function analyzeText(textContent, apiKey, modelName = 'gemini-2.1-flash', onProgress = () => { }) {
-    try {
+export async function analyzeText(textContent, apiKey, modelName = 'gemini-2.5-flash', onProgress = () => { }) {
+    let retries = 3;
+    let delay = 2000;
+
+    while (retries > 0) {
+        try {
         onProgress(10, 'Khởi tạo AI...');
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
@@ -161,14 +177,22 @@ export async function analyzeText(textContent, apiKey, modelName = 'gemini-2.1-f
             transcript: textContent // For notes, the transcript is the original text
         };
     } catch (error) {
+        if (error.message?.includes('503') && retries > 1) {
+            retries--;
+            onProgress(40, `Hệ thống bận, đang thử lại lần ${3 - retries}...`);
+            await new Promise(r => setTimeout(r, delay));
+            delay *= 2;
+            continue;
+        }
         console.error('Gemini Text Analysis Error:', error);
         throw error;
+    }
     }
 }
 /**
  * Hỏi đáp AI dựa trên ngữ cảnh cuộc họp
  */
-export async function chatWithAI(userMessage, context, history = [], apiKey, modelName = 'gemini-2.1-flash') {
+export async function chatWithAI(userMessage, context, history = [], apiKey, modelName = 'gemini-2.5-flash') {
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: modelName });
