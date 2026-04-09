@@ -64,9 +64,17 @@
             ></textarea>
           </div>
 
-          <div class="mb-8 flex items-center gap-2 text-emerald-500 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest">
-            <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            Đã lưu {{ savedKeysArray.length }} keys trong Database
+          <div class="mb-8 flex flex-col gap-2">
+            <div class="flex items-center gap-2 text-emerald-500 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest">
+              <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              Hệ thống có {{ savedKeysArray.length }} keys trong Database
+            </div>
+            
+            <div v-if="savedKeysArray.length > 0" class="flex items-center gap-2 text-[#FD94B4] text-[10px] font-black uppercase tracking-widest">
+              <Zap class="w-3 h-3" />
+              Đang sử dụng: Key #{{ configStore.activeKeyIndex + 1 }} 
+              <span class="opacity-50 font-mono ml-1">({{ maskApiKey(configStore.getActiveKey()) }})</span>
+            </div>
           </div>
 
           <div class="flex items-center gap-4 relative z-10">
@@ -120,7 +128,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { Key, Beaker, Info, ChevronDown, Sun, Moon, Monitor } from 'lucide-vue-next';
+import { Key, Beaker, Info, ChevronDown, Sun, Moon, Monitor, Zap } from 'lucide-vue-next';
 import { useThemeStore } from '../stores/themeStore';
 import { useAuthStore } from '../stores/authStore';
 import { useConfigStore } from '../stores/configStore';
@@ -197,6 +205,12 @@ const saveSettings = async () => {
   } finally {
     isSaving.value = false;
   }
+};
+
+const maskApiKey = (key) => {
+  if (!key) return '...';
+  if (key.length <= 8) return '****';
+  return key.substring(0, 4) + '...' + key.substring(key.length - 4);
 };
 </script>
 

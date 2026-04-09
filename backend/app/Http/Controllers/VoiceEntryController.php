@@ -115,10 +115,10 @@ class VoiceEntryController extends Controller
                 if ($path) {
                     $dbKeys = \App\Models\Config::where('key', 'gemini_api_keys')->first()?->value ?? [];
                     $apiKey = !empty($dbKeys) ? $dbKeys[0] : $request->header('X-Gemini-Api-Key');
-                    
+
                     $dbModel = \App\Models\Config::where('key', 'gemini_model')->first()?->value;
-                    $model = $dbModel ?? $request->header('X-Gemini-Model') ?? 'gemini-1.5-flash';
-                    
+                    $model = $dbModel ?? $request->header('X-Gemini-Model') ?? 'gemini-2.5-flash';
+
                     if (!$apiKey) {
                         Log::error('Voice Entry: API Key not found for server-side analysis');
                         throw new \Exception('Hệ thống chưa được cấu hình API Key. Vui lòng liên hệ Admin.');

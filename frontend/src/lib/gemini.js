@@ -38,7 +38,7 @@ export function getMimeType(file) {
  * Phân tích báo cáo cuộc họp (ZenVoice Logic)
  * @param {Blob} audioBlob - File âm thanh
  * @param {string} apiKey - Gemini API Key
- * @param {string} modelName - ID Model (mặc định gemini-2.1-flash hoặc gemini-2.0-flash-exp)
+ * @param {string} modelName - ID Model (mặc định gemini-2.5-flash hoặc gemini-2.0-flash-exp)
  * @param {function} onProgress - Callback tiến độ
  */
 export async function analyzeMeeting(audioBlob, apiKey, modelName = 'gemini-2.5-flash', onProgress = () => { }) {
@@ -47,22 +47,22 @@ export async function analyzeMeeting(audioBlob, apiKey, modelName = 'gemini-2.5-
 
     while (retries > 0) {
         try {
-        onProgress(10, 'Khởi tạo AI...');
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({
-            model: modelName,
-            generationConfig: {
-                temperature: 0.2,
-                responseMimeType: "application/json",
-            }
-        });
+            onProgress(10, 'Khởi tạo AI...');
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({
+                model: modelName,
+                generationConfig: {
+                    temperature: 0.2,
+                    responseMimeType: "application/json",
+                }
+            });
 
-        onProgress(30, 'Chuyển đổi dữ liệu âm thanh...');
-        const base64Data = await blobToBase64(audioBlob);
+            onProgress(30, 'Chuyển đổi dữ liệu âm thanh...');
+            const base64Data = await blobToBase64(audioBlob);
 
-        onProgress(50, 'Đang phân tích với AI (đang xử lý)...');
+            onProgress(50, 'Đang phân tích với AI (đang xử lý)...');
 
-        const prompt = `Phân tích báo cáo âm thanh và trả về JSON chuẩn:
+            const prompt = `Phân tích báo cáo âm thanh và trả về JSON chuẩn:
     { 
       "title": "Tên báo cáo ngắn gọn", 
       "summary": "Tóm tắt súc tích", 
@@ -92,36 +92,51 @@ export async function analyzeMeeting(audioBlob, apiKey, modelName = 'gemini-2.5-
     2. Mindmap phải có ít nhất 3-5 nhánh chính (branches), mỗi nhánh có ít nhất 2-3 ý con (children).
     3. Trả về JSON thuần túy, KHÔNG nằm trong khối markdown (\`\`\`json).`;
 
-        const result = await model.generateContent([
-            {
-                inlineData: {
-                    data: base64Data,
-                    mimeType: getMimeType(audioBlob)
-                }
-            },
-            { text: prompt }
-        ]);
+            const result = await model.generateContent([
+                {
+                    inlineData: {
+                        data: base64Data,
+                        mimeType: getMimeType(audioBlob)
+                    }
+                },
+                { text: prompt }
+            ]);
 
-        onProgress(90, 'Hoàn tất trích xuất dữ liệu...');
-        const response = await result.response;
-        let text = response.text();
+            onProgress(90, 'Hoàn tất trích xuất dữ liệu...');
+            const response = await result.response;
+            let text = response.text();
 
-        // Clean up potential markdown blocks
-        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            // Clean up potential markdown blocks
+            text = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
-        onProgress(100, 'Xong!');
-        return JSON.parse(text);
-    } catch (error) {
-        if (error.message?.includes('503') && retries > 1) {
-            retries--;
-            onProgress(50, `Hệ thống bận, đang thử lại lần ${3 - retries}...`);
-            await new Promise(r => setTimeout(r, delay));
-            delay *= 2;
-            continue;
+            onProgress(100, 'Xong!');
+            return JSON.parse(text);
+        } catch (error) {
+            const msg = error.message?.toLowerCase() || '';
+            const isQuotaError = msg.includes('429') || msg.includes('quota') || msg.includes('limit');
+            const isServiceError = msg.includes('503') || msg.includes('demand') || msg.includes('overloaded');
+
+            // For Rate Limit (429), don't retry same key, throw immediately so failover can happen
+            if (isQuotaError) {
+                throw new Error('QUOTA_EXHAUSTED');
+            }
+
+            // For Service Busy (503), retry 2 times then throw
+            if (isServiceError && retries > 1) {
+                retries--;
+                onProgress(50, `Hệ thống bận, đang thử lại lần ${3 - retries}...`);
+                await new Promise(r => setTimeout(r, delay));
+                delay *= 2;
+                continue;
+            }
+            
+            if (isServiceError) {
+                throw new Error('SERVICE_BUSY');
+            }
+
+            console.error('Gemini Analysis Error:', error);
+            throw error;
         }
-        console.error('Gemini Analysis Error:', error);
-        throw error;
-    }
     }
 }
 
@@ -134,19 +149,19 @@ export async function analyzeText(textContent, apiKey, modelName = 'gemini-2.5-f
 
     while (retries > 0) {
         try {
-        onProgress(10, 'Khởi tạo AI...');
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({
-            model: modelName,
-            generationConfig: {
-                temperature: 0.2,
-                responseMimeType: "application/json",
-            }
-        });
+            onProgress(10, 'Khởi tạo AI...');
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({
+                model: modelName,
+                generationConfig: {
+                    temperature: 0.2,
+                    responseMimeType: "application/json",
+                }
+            });
 
-        onProgress(40, 'Đang phân tích nội dung văn bản...');
+            onProgress(40, 'Đang phân tích nội dung văn bản...');
 
-        const prompt = `Phân tích nội dung ghi chú và trả về JSON chuẩn:
+            const prompt = `Phân tích nội dung ghi chú và trả về JSON chuẩn:
     { 
       "title": "...", 
       "summary": "...", 
@@ -166,27 +181,40 @@ export async function analyzeText(textContent, apiKey, modelName = 'gemini-2.5-f
     2. Mindmap phải có ít nhất 3-5 nhánh chính (branches), mỗi nhánh có ít nhất 2-3 ý con (children).
     3. Trả về JSON thuần túy, KHÔNG nằm trong khối markdown (\`\`\`json).`;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        let text = response.text();
-        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            let text = response.text();
+            text = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
-        onProgress(100, 'Xong!');
-        return {
-            ...JSON.parse(text),
-            transcript: textContent // For notes, the transcript is the original text
-        };
-    } catch (error) {
-        if (error.message?.includes('503') && retries > 1) {
-            retries--;
-            onProgress(40, `Hệ thống bận, đang thử lại lần ${3 - retries}...`);
-            await new Promise(r => setTimeout(r, delay));
-            delay *= 2;
-            continue;
+            onProgress(100, 'Xong!');
+            return {
+                ...JSON.parse(text),
+                transcript: textContent // For notes, the transcript is the original text
+            };
+        } catch (error) {
+            const msg = error.message?.toLowerCase() || '';
+            const isQuotaError = msg.includes('429') || msg.includes('quota') || msg.includes('limit');
+            const isServiceError = msg.includes('503') || msg.includes('demand') || msg.includes('overloaded');
+
+            if (isQuotaError) {
+                throw new Error('QUOTA_EXHAUSTED');
+            }
+
+            if (isServiceError && retries > 1) {
+                retries--;
+                onProgress(40, `Hệ thống bận, đang thử lại lần ${3 - retries}...`);
+                await new Promise(r => setTimeout(r, delay));
+                delay *= 2;
+                continue;
+            }
+
+            if (isServiceError) {
+                throw new Error('SERVICE_BUSY');
+            }
+
+            console.error('Gemini Text Analysis Error:', error);
+            throw error;
         }
-        console.error('Gemini Text Analysis Error:', error);
-        throw error;
-    }
     }
 }
 /**

@@ -28,7 +28,7 @@
         </button>
       </div>
 
-      <div class="p-6 relative z-10 flex-1 overflow-y-auto max-h-[70vh]">
+      <div :class="['p-6 relative z-10 flex-1 overflow-y-auto max-h-[70vh]', (isRecording || isUploading) ? 'overflow-hidden' : '']">
         <!-- Analysis/Saving State -->
         <div v-if="isUploading" class="flex flex-col items-center justify-center py-10">
           <div class="relative w-20 h-20 mb-6 flex items-center justify-center">
@@ -58,11 +58,17 @@
         </div>
 
         <!-- Tab Content: Microphone -->
-        <div v-else-if="activeTab === 'mic'" class="flex flex-col items-center">
+        <div v-else-if="activeTab === 'mic'" class="flex flex-col items-center min-h-[300px] justify-center">
           <div class="w-full h-32 mb-8 bg-[#131d1a] rounded-2xl flex items-center justify-center overflow-hidden border border-[#FD94B4]/10 relative">
              <canvas ref="canvasRef" class="w-full h-full"></canvas>
              <div v-if="!isRecording" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm font-medium">
                Nhấn vào nút bên dưới để bắt đầu
+             </div>
+             <div v-else-if="isPaused" class="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[2px] transition-all">
+                <div class="flex items-center gap-2 px-4 py-2 bg-black/40 rounded-full border border-white/10">
+                   <Pause class="w-4 h-4 text-[#FD94B4]" fill="currentColor" />
+                   <span class="text-[10px] font-black uppercase tracking-widest text-white">Đã tạm dừng</span>
+                </div>
              </div>
           </div>
           
@@ -70,23 +76,36 @@
             {{ formattedTime }}
           </div>
 
-          <div class="flex items-center gap-6 w-full px-8 justify-center">
-            <button v-if="isRecording" @click="stopRecording" class="w-14 h-14 flex items-center justify-center rounded-full bg-white/10 text-slate-200 hover:bg-white/20 transition-all">
+          <div class="flex items-center gap-6 w-full px-8 justify-center py-10 relative overflow-visible">
+            <!-- Reset Button -->
+            <button v-if="isRecording" @click="resetRecording" 
+                    class="w-14 h-14 flex items-center justify-center rounded-full bg-white/5 text-slate-400 hover:bg-rose-500/10 hover:text-rose-500 transition-all border border-transparent hover:border-rose-500/20"
+                    title="Làm lại từ đầu">
               <Square class="w-5 h-5" fill="currentColor" />
             </button>
-            <div class="relative">
-              <div v-if="isRecording" class="absolute -inset-2 rounded-full bg-rose-500/30 animate-ping"></div>
+            <div v-else class="w-14 h-14"></div>
+
+            <!-- Main Record/Pause Button -->
+            <div class="relative flex items-center justify-center w-20 h-20">
+              <div v-if="isRecording && !isPaused" class="absolute inset-0 rounded-full bg-rose-500/40 animate-ping"></div>
               <button @click="toggleRecording" :class="[
-                'w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95 relative z-10',
-                isRecording ? 'bg-gradient-to-tr from-rose-500 to-red-600' : 'bg-gradient-to-tr from-[#FD94B4] to-[#F34455]'
+                'w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-110 active:scale-95 relative z-10',
+                !isRecording ? 'bg-gradient-to-tr from-[#FD94B4] to-[#F34455]' : (isPaused ? 'bg-emerald-500' : 'bg-gradient-to-tr from-rose-500 to-red-600 shadow-[0_0_20px_rgba(244,63,94,0.4)]')
               ]">
                 <Mic v-if="!isRecording" class="w-8 h-8 text-white" />
+                <Play v-else-if="isPaused" class="w-8 h-8 text-white" fill="currentColor" />
                 <Pause v-else class="w-8 h-8 text-white" fill="currentColor" />
               </button>
             </div>
-            <button v-if="isRecording" @click="submitRecording" class="w-14 h-14 flex items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all">
+
+            <!-- Submit Button -->
+            <button v-if="isRecording" @click="submitRecording" 
+                    class="w-14 h-14 flex items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all border border-emerald-500/20"
+                    title="Hoàn tất & Phân tích">
               <Check class="w-6 h-6" />
             </button>
+            <!-- Placeholder for alignment when not recording -->
+            <div v-else class="w-14 h-14"></div>
           </div>
         </div>
 
@@ -149,9 +168,9 @@
 
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
-import { Mic, X, Square, Pause, Check, Upload, FileText, Music, Sparkles, Zap } from 'lucide-vue-next'
+import { Mic, X, Square, Pause, Check, Upload, FileText, Music, Sparkles, Zap, Play } from 'lucide-vue-next'
 import api from '../../lib/axios'
-import { analyzeMeeting, getMimeType } from '../../lib/gemini'
+import { analyzeMeeting, analyzeText, getMimeType } from '../../lib/gemini'
 import { useConfigStore } from '../../stores/configStore'
 
 const configStore = useConfigStore()
@@ -168,6 +187,7 @@ const emit = defineEmits(['success'])
 const isOpen = ref(false)
 const activeTab = ref('mic')
 const isRecording = ref(false)
+const isPaused = ref(false)
 const isUploading = ref(false)
 const time = ref(0)
 const canvasRef = ref(null)
@@ -219,13 +239,34 @@ const open = () => {
 }
 
 const close = () => {
-  if (isRecording.value) stopRecording()
+  if (isRecording.value) stopRecorderResources()
   isOpen.value = false
 }
 
 const toggleRecording = async () => {
-  if (isRecording.value) stopRecording()
-  else await startRecording()
+  if (isRecording.value) {
+    if (isPaused.value) resumeRecording()
+    else pauseRecording()
+  } else {
+    await startRecording()
+  }
+}
+
+const pauseRecording = () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.pause()
+    isPaused.value = true
+    clearInterval(timerInterval)
+  }
+}
+
+const resumeRecording = () => {
+  if (mediaRecorder && mediaRecorder.state === 'paused') {
+    mediaRecorder.resume()
+    isPaused.value = false
+    timerInterval = setInterval(() => time.value++, 1000)
+    drawWaveform() // Resume animation
+  }
 }
 
 const startRecording = async () => {
@@ -233,15 +274,22 @@ const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     mediaRecorder = new MediaRecorder(stream)
     audioChunks = []
+    
+    // Setup Audio Visualization
     audioContext = new (window.AudioContext || window.webkitAudioContext)()
     analyser = audioContext.createAnalyser()
     const source = audioContext.createMediaStreamSource(stream)
     source.connect(analyser)
     analyser.fftSize = 256
     dataArray = new Uint8Array(analyser.frequencyBinCount)
-    mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data)
-    mediaRecorder.start(100)
+    
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunks.push(e.data)
+    }
+    
+    mediaRecorder.start(250) // Capture in chunks every 250ms
     isRecording.value = true
+    isPaused.value = false
     time.value = 0
     timerInterval = setInterval(() => time.value++, 1000)
     drawWaveform()
@@ -250,15 +298,32 @@ const startRecording = async () => {
   }
 }
 
-const stopRecording = () => {
+const resetRecording = () => {
+  if (!confirm('Bạn có muốn hủy đoạn đang thu và làm lại không?')) return
+  stopRecorderResources()
+  time.value = 0
+  audioChunks = []
+}
+
+const stopRecorderResources = () => {
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop()
     mediaRecorder.stream.getTracks().forEach(track => track.stop())
   }
   isRecording.value = false
+  isPaused.value = false
   clearInterval(timerInterval)
   cancelAnimationFrame(animationId)
-  if (audioContext && audioContext.state !== 'closed') audioContext.close()
+  
+  // Clear Waveform on stop/reset
+  if (canvasRef.value) {
+    const ctx = canvasRef.value.getContext('2d')
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight)
+  }
+
+  if (audioContext && audioContext.state !== 'closed') {
+    audioContext.close()
+  }
 }
 
 
@@ -282,7 +347,20 @@ const getApiConfig = () => {
 }
 
 const submitRecording = async () => {
-  await sharedSubmitAudio(new Blob(audioChunks, { type: 'audio/webm' }), 'microphone')
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  }
+  
+  // Give a small delay for the final chunk to be processed
+  setTimeout(async () => {
+    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
+    if (audioBlob.size < 100) {
+      alert('Không nhận được dữ liệu âm thanh. Vui lòng thử lại.')
+      resetRecording()
+      return
+    }
+    await sharedSubmitAudio(audioBlob, 'microphone')
+  }, 300)
 }
 
 const submitFileUpload = async () => {
@@ -291,104 +369,153 @@ const submitFileUpload = async () => {
 }
 
 const sharedSubmitAudio = async (blob, source) => {
-  stopRecording()
+  stopRecorderResources()
   isUploading.value = true
   currentStep.value = 0
   
-  try {
-    const { apiKey, modelName } = getApiConfig()
-    if (!apiKey) throw new Error('Vui lòng cấu hình API Key trong Settings.')
+  let success = false
+  let attempts = 0
+  const maxAttempts = configStore.apiKeys.length || 1
 
-    const aiResult = await analyzeMeeting(blob, apiKey, modelName, (progress) => {
-      if (progress < 30) currentStep.value = 0
-      else if (progress < 60) currentStep.value = 1
-      else if (progress < 90) currentStep.value = 2
-      else currentStep.value = 3
-    })
+  while (!success && attempts < maxAttempts) {
+    try {
+      const { apiKey, modelName } = getApiConfig()
+      if (!apiKey) throw new Error('Vui lòng cấu hình API Key trong Settings.')
 
-    const formData = new FormData()
-    const mimeType = getMimeType(blob)
-    
-    // Đảm bảo gửi kèm Project ID và Source
-    formData.append('audio', blob, blob.name || `voice_${Date.now()}.webm`)
-    formData.append('project_id', Number(props.projectId))
-    formData.append('source', source)
-    formData.append('ai_result', JSON.stringify(aiResult))
+      const aiResult = await analyzeMeeting(blob, apiKey, modelName, (progress) => {
+        if (progress < 30) currentStep.value = 0
+        else if (progress < 60) currentStep.value = 1
+        else if (progress < 90) currentStep.value = 2
+        else currentStep.value = 3
+      })
 
-    // Log check
-    console.log('Sending data:', {
-        projectId: props.projectId,
-        source: source,
-        mimeType: mimeType
-    })
+      const formData = new FormData()
+      formData.append('audio', blob, blob.name || `voice_${Date.now()}.webm`)
+      formData.append('project_id', Number(props.projectId))
+      formData.append('source', source)
+      formData.append('ai_result', JSON.stringify(aiResult))
 
-    const response = await api.post('/voices', formData)
-    
-    currentStep.value = 4
-    setTimeout(() => {
-      emit('success', response.data)
+      const response = await api.post('/voices', formData)
+      
+      currentStep.value = 4
+      setTimeout(() => {
+        emit('success', response.data)
+        isUploading.value = false
+        close()
+      }, 1000)
+      success = true
+    } catch (err) {
+      const errorMsg = err.message || ''
+      const isFailoverTrigger = errorMsg === 'QUOTA_EXHAUSTED' || errorMsg === 'SERVICE_BUSY' || errorMsg.includes('bận') || errorMsg.includes('hết lượt')
+      
+      if (isFailoverTrigger && attempts < maxAttempts - 1) {
+        configStore.rotateKey()
+        attempts++
+        // Show status in UI
+        const statusMsg = errorMsg === 'QUOTA_EXHAUSTED' ? 'API Key hết hạn mức. Đang đổi Key dự phòng...' : 'AI đang bận. Đang thử Key dự phòng...'
+        // Temporarily override the current step text by setting it to a special "loading" state if needed
+        // For now, we reuse currentStep logic or just log
+        console.warn(`${statusMsg} (Lần thử ${attempts}/${maxAttempts})`)
+        continue
+      }
+      
+      console.error('Upload error detail:', err.response?.data || err.message)
+      alert('Lỗi: ' + (err.response?.data?.message || err.message || 'Hệ thống AI đang gặp sự cố. Vui lòng thử lại sau.'))
       isUploading.value = false
-      close()
-    }, 1000)
-  } catch (err) {
-    console.error('Upload error detail:', err.response?.data || err.message)
-    alert('Lỗi: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'))
-    isUploading.value = false
+      break
+    }
   }
 }
 
 const submitNote = async () => {
   if (!noteContent.value.trim()) return
   isUploading.value = true
+  
+  let success = false
+  let attempts = 0
+  const maxAttempts = configStore.apiKeys.length || 1
 
-  try {
-    const formData = new FormData()
-    formData.append('project_id', Number(props.projectId))
-    formData.append('source', 'manual')
-    formData.append('transcript', noteContent.value)
-    formData.append('title', 'Ghi chú: ' + noteContent.value.substring(0, 30) + '...')
+  while (!success && attempts < maxAttempts) {
+    try {
+      const { apiKey, modelName } = getApiConfig()
+      if (!apiKey) throw new Error('Vui lòng cấu hình API Key trong Settings.')
 
-    const response = await api.post('/voices', formData)
-    
-    setTimeout(() => {
-      emit('success', response.data)
+      const aiResult = await analyzeText(noteContent.value, apiKey, modelName, (progress) => {
+        // Simple progress for note analysis
+      })
+
+      const formData = new FormData()
+      formData.append('project_id', Number(props.projectId))
+      formData.append('source', 'manual')
+      formData.append('transcript', noteContent.value)
+      formData.append('title', aiResult.title || ('Ghi chú: ' + noteContent.value.substring(0, 30) + '...'))
+      formData.append('ai_result', JSON.stringify(aiResult))
+
+      const response = await api.post('/voices', formData)
+      
+      setTimeout(() => {
+        emit('success', response.data)
+        isUploading.value = false
+        close()
+      }, 500)
+      success = true
+    } catch (err) {
+      const errorMsg = err.message || ''
+      const isFailoverTrigger = errorMsg === 'QUOTA_EXHAUSTED' || errorMsg === 'SERVICE_BUSY' || errorMsg.includes('bận') || errorMsg.includes('hết lượt')
+
+      if (isFailoverTrigger && attempts < maxAttempts - 1) {
+        configStore.rotateKey()
+        attempts++
+        continue
+      }
+
+      console.error('Note analysis error:', err.response?.data || err.message)
+      alert('Lỗi: ' + (err.response?.data?.message || err.message || 'Hệ thống AI đang gặp sự cố.'))
       isUploading.value = false
-      close()
-    }, 500)
-  } catch (err) {
-    console.error('Note error detail:', err.response?.data || err.message)
-    alert('Lỗi khi lưu ghi chú: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'))
-    isUploading.value = false
+      break
+    }
   }
 }
 
+let canvasWidth = 0;
+let canvasHeight = 0;
+
 const drawWaveform = () => {
-  if (!canvasRef.value || !isRecording.value) return
+  if (!canvasRef.value || !isRecording.value || isPaused.value) return
   const canvas = canvasRef.value
   const ctx = canvas.getContext('2d')
-  const width = canvas.width = canvas.offsetWidth
-  const height = canvas.height = canvas.offsetHeight
+  
+  // Only update canvas dimensions if they changed at the DOM level
+  if (canvas.offsetWidth !== canvasWidth || canvas.offsetHeight !== canvasHeight) {
+    canvasWidth = canvas.offsetWidth;
+    canvasHeight = canvas.offsetHeight;
+    canvas.width = canvasWidth * window.devicePixelRatio;
+    canvas.height = canvasHeight * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  }
+  
   animationId = requestAnimationFrame(drawWaveform)
   analyser.getByteFrequencyData(dataArray)
-  ctx.clearRect(0, 0, width, height)
-  const gradient = ctx.createLinearGradient(0, height, 0, 0)
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight)
+  
+  const gradient = ctx.createLinearGradient(0, canvasHeight, 0, 0)
   gradient.addColorStop(0, '#F34455')
   gradient.addColorStop(1, '#FD94B4')
   ctx.fillStyle = gradient
   const barWidth = 4
   const gap = 2
-  const bars = Math.floor(width / (barWidth + gap))
+  const bars = Math.floor(canvasWidth / (barWidth + gap))
   const step = Math.floor(dataArray.length / bars) || 1
   for (let i = 0; i < bars; i++) {
     const value = dataArray[i * step] || 0
-    let barHeight = height * (value / 255) * 0.8
+    let barHeight = canvasHeight * (value / 255) * 0.8
     ctx.beginPath()
-    ctx.roundRect(i * (barWidth + gap), height / 2 - barHeight / 2, barWidth, Math.max(2, barHeight), 4)
+    ctx.roundRect(i * (barWidth + gap), canvasHeight / 2 - barHeight / 2, barWidth, Math.max(2, barHeight), 4)
     ctx.fill()
   }
 }
 
-onUnmounted(() => stopRecording())
+onUnmounted(() => stopRecorderResources())
 defineExpose({ open, close })
 </script>
 

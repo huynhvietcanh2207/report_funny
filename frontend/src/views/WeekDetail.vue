@@ -30,12 +30,12 @@
         <div v-else v-for="entry in week.voice_entries" :key="entry.id" 
               @click="activeEntry = entry"
               :class="[
-                'p-5 rounded-2xl cursor-pointer transition-all border group relative overflow-hidden',
+                'p-5 rounded-2xl cursor-pointer transition-all border group relative',
                 activeEntry?.id === entry.id 
                   ? 'bg-white dark:bg-[#F34455]/10 border-[#F34455]/30 shadow-lg scale-[1.02] z-10' 
                   : 'bg-white dark:bg-[#0c1210] border-black/5 dark:border-white/5 hover:border-[#F34455]/20 hover:bg-slate-50/50 dark:hover:bg-white/5'
               ]">
-          <div v-if="activeEntry?.id === entry.id" class="absolute inset-0 bg-gradient-to-br from-[#FD94B4]/5 to-transparent opacity-50"></div>
+          <div v-if="activeEntry?.id === entry.id" class="absolute inset-0 bg-gradient-to-br from-[#FD94B4]/5 to-transparent opacity-50 rounded-2xl"></div>
           
           <div class="flex items-center gap-4 relative z-10">
             <div :class="['w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-500', 
@@ -51,7 +51,7 @@
                   <button @click.stop="toggleMenu(entry.id)" class="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl text-slate-300 dark:text-slate-700 hover:text-slate-600 dark:hover:text-white transition-colors">
                     <MoreVertical class="w-4 h-4" />
                   </button>
-                  <div v-if="activeMenuId === entry.id" class="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-[#131d1a] border border-black/10 dark:border-white/10 rounded-2xl shadow-2xl z-20 py-2 overflow-hidden animate-fade-in">
+                  <div v-if="activeMenuId === entry.id" class="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-[#131d1a] border border-black/10 dark:border-white/10 rounded-2xl shadow-2xl z-[100] py-2 overflow-hidden animate-fade-in">
                     <button @click.stop="renameEntry(entry)" class="w-full text-left px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
                       <Edit2 class="w-3.5 h-3.5 text-[#FD94B4]" /> Đổi tên
                     </button>

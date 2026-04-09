@@ -7,12 +7,16 @@ export const useConfigStore = defineStore('config', () => {
     const activeModel = ref('gemini-2.5-flash');
     const loading = ref(false);
 
+    const activeKeyIndex = ref(0);
+
     const fetchConfig = async () => {
         loading.value = true;
         try {
             const response = await api.get('/ai-config');
             apiKeys.value = response.data.gemini_api_keys || [];
-            activeModel.value = response.data.gemini_model || 'gemini-2.1-flash';
+            activeModel.value = response.data.gemini_model || 'gemini-2.5-flash';
+            // Reset index on fetch
+            activeKeyIndex.value = 0;
         } catch (error) {
             console.error('Failed to fetch AI configuration:', error);
         } finally {
@@ -22,15 +26,24 @@ export const useConfigStore = defineStore('config', () => {
 
     const getActiveKey = () => {
         if (apiKeys.value.length === 0) return null;
-        // Simple rotation: random selection or just pick the first one
-        return apiKeys.value[Math.floor(Math.random() * apiKeys.value.length)];
+        return apiKeys.value[activeKeyIndex.value];
+    };
+
+    const rotateKey = () => {
+        if (apiKeys.value.length > 1) {
+            activeKeyIndex.value = (activeKeyIndex.value + 1) % apiKeys.value.length;
+            return true;
+        }
+        return false;
     };
 
     return {
         apiKeys,
         activeModel,
+        activeKeyIndex,
         loading,
         fetchConfig,
-        getActiveKey
+        getActiveKey,
+        rotateKey
     };
 });
