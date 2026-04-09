@@ -152,6 +152,9 @@ import { ref, computed, onUnmounted } from 'vue'
 import { Mic, X, Square, Pause, Check, Upload, FileText, Music, Sparkles, Zap } from 'lucide-vue-next'
 import api from '../../lib/axios'
 import { analyzeMeeting, getMimeType } from '../../lib/gemini'
+import { useConfigStore } from '../../stores/configStore'
+
+const configStore = useConfigStore()
 
 const props = defineProps({
   projectId: {
@@ -272,19 +275,9 @@ const handleFileChange = (e) => {
 }
 
 const getApiConfig = () => {
-  const storedKeys = localStorage.getItem('gemini_api_keys')
-  let apiKey = null
-  if (storedKeys) {
-    try {
-      const keys = JSON.parse(storedKeys)
-      apiKey = Array.isArray(keys) ? keys[0] : storedKeys
-    } catch (e) {
-      apiKey = storedKeys
-    }
-  }
   return {
-    apiKey,
-    modelName: localStorage.getItem('gemini_model') || 'gemini-2.1-flash'
+    apiKey: configStore.getActiveKey(),
+    modelName: configStore.activeModel || 'gemini-2.5-flash'
   }
 }
 
