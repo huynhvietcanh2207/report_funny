@@ -11,7 +11,7 @@ Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
-    
+
     Route::apiResource('users', \App\Http\Controllers\UserController::class);
     Route::apiResource('projects', \App\Http\Controllers\ProjectController::class);
     Route::post('projects/{project}/members', [\App\Http\Controllers\ProjectController::class, 'addMembers']);
@@ -24,4 +24,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/settings', [\App\Http\Controllers\ConfigController::class, 'index']);
     Route::post('/settings', [\App\Http\Controllers\ConfigController::class, 'update']);
     Route::get('/ai-config', [\App\Http\Controllers\ConfigController::class, 'getAIConfig']);
+});
+Route::any('/test-path', function (Illuminate\Http\Request $request) {
+    return [
+        'path' => $request->path(),
+        'uri' => $request->getRequestUri(),
+    ];
 });
