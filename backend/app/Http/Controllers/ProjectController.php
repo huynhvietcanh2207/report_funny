@@ -12,8 +12,24 @@ class ProjectController extends Controller
      */
     public function index(Request $request)
     {
-        // Filter by logged in user membership
-        $projects = $request->user()->projects()->with('members')->orderBy('created_at', 'desc')->get();
+        $user = $request->user();
+        
+        if ($user->role === 'admin') {
+            // Admin gets all projects
+            $projects = Project::with('members')->orderBy('created_at', 'desc')->get();
+            
+            // Add is_member flag
+            $projects->each(function($project) use ($user) {
+                $project->is_member = $project->members->contains($user->id);
+            });
+        } else {
+            // Normal user gets only their projects
+            $projects = $user->projects()->with('members')->orderBy('created_at', 'desc')->get();
+            $projects->each(function($project) {
+                $project->is_member = true;
+            });
+        }
+
         return response()->json($projects);
     }
 
@@ -49,13 +65,23 @@ class ProjectController extends Controller
         return response()->json($project->load('members'), 201);
     }
 
-    public function show(Project $project)
+    public function show(Request $request, Project $project)
     {
+        // Check membership
+        if (!$project->members->contains($request->user()->id)) {
+            return response()->json(['message' => 'Bạn không phải là thành viên của dự án này.'], 403);
+        }
+
         return response()->json($project->load(['members', 'weeklyVoices']));
     }
 
     public function update(Request $request, Project $project)
     {
+        // Check membership
+        if (!$project->members->contains($request->user()->id)) {
+            return response()->json(['message' => 'Bạn không có quyền chỉnh sửa dự án này.'], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
@@ -92,8 +118,13 @@ class ProjectController extends Controller
         return response()->json(['message' => 'Đã xóa thành viên khỏi dự án.']);
     }
 
-    public function destroy(Project $project)
+    public function destroy(Request $request, Project $project)
     {
+        // Check membership
+        if (!$project->members->contains($request->user()->id)) {
+            return response()->json(['message' => 'Bạn không có quyền xóa dự án này.'], 403);
+        }
+
         // Check if project has any data
         if ($project->weeklyVoices()->count() > 0) {
             return response()->json([

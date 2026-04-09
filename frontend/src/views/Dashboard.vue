@@ -66,7 +66,10 @@
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div v-for="project in projectStore.projects" :key="project.id" @click="$router.push(`/projects/${project.id}`)" class="glass-card glass-card-hover p-0 cursor-pointer group bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-[2rem] overflow-hidden relative shadow-md">
+        <div v-for="project in projectStore.projects" :key="project.id" 
+             @click="project.is_member !== false ? $router.push(`/projects/${project.id}`) : null" 
+             :class="['glass-card glass-card-hover p-0 cursor-pointer group bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-[2rem] overflow-hidden relative shadow-md transition-all',
+                      project.is_member === false ? 'opacity-70 grayscale-[0.5] !cursor-not-allowed' : '']">
           <div class="absolute inset-0 bg-gradient-to-br from-[#FD94B4]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
           
           <div class="p-6">
@@ -75,10 +78,13 @@
                 <Folders class="w-6 h-6" />
               </div>
               <div class="flex items-center gap-2">
-                <span class="px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10">
+                <span v-if="project.is_member === false" class="px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full bg-slate-500/10 text-slate-500 border border-slate-500/10 flex items-center gap-1">
+                  <Lock class="w-2.5 h-2.5" /> No Access
+                </span>
+                <span v-else class="px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10">
                   Active
                 </span>
-                <div class="relative group-menu">
+                <div v-if="project.is_member !== false" class="relative group-menu">
                   <button @click.stop="toggleMenu(project.id)" class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">
                     <MoreVertical class="w-4 h-4" />
                   </button>
@@ -181,7 +187,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { Plus, LayoutGrid, Mic, FileText, FolderOpen, Folders, MoreVertical, Edit2, Trash2, Check } from 'lucide-vue-next';
+import { Plus, LayoutGrid, Mic, FileText, FolderOpen, Folders, MoreVertical, Edit2, Trash2, Check, Lock } from 'lucide-vue-next';
 import { useProjectStore } from '../stores/projectStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useUserStore } from '../stores/userStore';
