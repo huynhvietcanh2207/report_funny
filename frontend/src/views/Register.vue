@@ -63,15 +63,21 @@
             </div>
           </div>
 
+          <div v-if="successMessage" class="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-500 text-[10px] font-black uppercase tracking-widest text-center animate-fade-in mt-2">
+            {{ successMessage }}
+          </div>
+
           <div v-if="error" class="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-500 text-[10px] font-black uppercase tracking-widest text-center animate-shake mt-2">
             {{ error }}
           </div>
 
-          <button type="submit" :disabled="authStore.loading"
+          <button type="submit" :disabled="isLoading || !!successMessage"
                   class="w-full py-5 bg-gradient-to-r from-[#FD94B4] to-[#F34455] text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-[0_15px_30px_rgba(243,68,85,0.3)] hover:shadow-[0_20px_40px_rgba(243,68,85,0.6)] hover:-translate-y-1 transition-all active:scale-95 disabled:opacity-50 mt-4">
-            <span v-if="!authStore.loading" class="flex items-center justify-center gap-3">
+            <span v-if="!isLoading && !successMessage" class="flex items-center justify-center gap-3">
               Tạo tài khoản ngay
-              <ChevronRight class="w-4 h-4" />
+            </span>
+            <span v-else-if="successMessage" class="flex items-center justify-center gap-2">
+              ✓ Đã tạo thành công!
             </span>
             <span v-else class="flex items-center justify-center gap-2">
               <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -95,11 +101,12 @@
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { UserPlus, User, Mail, Lock, ShieldCheck } from 'lucide-vue-next';
-import { useAuthStore } from '../stores/authStore';
+import api from '../lib/axios';
 
 const router = useRouter();
-const authStore = useAuthStore();
 const error = ref(null);
+const isLoading = ref(false);
+const successMessage = ref(null);
 
 const form = reactive({
   name: '',
@@ -110,17 +117,25 @@ const form = reactive({
 
 const handleRegister = async () => {
   error.value = null;
+  successMessage.value = null;
   
   if (form.password !== form.password_confirmation) {
     error.value = 'Mật khẩu xác nhận không khớp.';
     return;
   }
 
+  isLoading.value = true;
   try {
-    await authStore.register(form);
-    router.push('/');
+    await api.post('/register', form);
+    // Don't auto-login — redirect to login page with success message
+    successMessage.value = 'Tạo tài khoản thành công! Đang chuyển đến trang đăng nhập...';
+    setTimeout(() => {
+      router.push('/login');
+    }, 2000);
   } catch (err) {
-    error.value = err.message || 'Lỗi đăng ký. Vui lòng thử lại sau.';
+    error.value = err.response?.data?.message || err.message || 'Lỗi đăng ký. Vui lòng thử lại sau.';
+  } finally {
+    isLoading.value = false;
   }
 };
 </script>
@@ -137,5 +152,12 @@ const handleRegister = async () => {
 }
 .animate-shake {
   animation: shake 0.2s ease-in-out 0s 2;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
 }
 </style>

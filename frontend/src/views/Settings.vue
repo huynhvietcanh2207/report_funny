@@ -1,14 +1,14 @@
 <template>
   <div class="max-w-3xl mx-auto space-y-8 animate-fade-in pb-12 pt-6">
     <div>
-      <h1 class="text-4xl font-black text-slate-800 dark:text-white mb-2 tracking-tight uppercase">Cấu hình hệ thống</h1>
+      <h1 class="text-2xl sm:text-4xl font-black text-slate-800 dark:text-white mb-2 tracking-tight uppercase">Cấu hình hệ thống</h1>
       <p class="text-slate-500 dark:text-slate-400 font-bold tracking-widest text-xs uppercase">Thiết lập AI & Giao diện</p>
     </div>
 
     <!-- Personalization Section: Always Visible -->
     <div class="space-y-4">
       <h2 class="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Tùy chỉnh cá nhân</h2>
-      <div class="glass-card p-6 bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-3xl shadow-xl">
+      <div class="glass-card p-4 sm:p-6 bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-2xl sm:rounded-3xl shadow-xl">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-2xl bg-[#F34455]/10 flex items-center justify-center text-[#F34455] dark:text-[#FD94B4]">
@@ -44,7 +44,7 @@
     <!-- Admin Section (Controlled by server access) -->
     <div v-if="authStore.user?.role === 'admin'" class="space-y-8 animate-fade-in">
         <!-- API Key Section -->
-        <div class="glass-card p-8 bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 relative overflow-hidden group rounded-[2.5rem] shadow-xl">
+        <div class="glass-card p-5 sm:p-8 bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 relative overflow-hidden group rounded-2xl sm:rounded-[2.5rem] shadow-xl">
           <div class="flex items-center gap-4 mb-6 shrink-0 relative z-10">
             <div class="w-10 h-10 rounded-xl bg-[#F34455]/10 flex items-center justify-center text-[#F34455] dark:text-[#FD94B4]">
               <Key class="w-5 h-5 transform -rotate-45" />
@@ -87,7 +87,7 @@
         </div>
 
         <!-- Model AI Section -->
-        <div class="glass-card p-8 bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-[2.5rem] shadow-xl">
+        <div class="glass-card p-5 sm:p-8 bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-2xl sm:rounded-[2.5rem] shadow-xl">
           <div class="flex items-center gap-4 mb-6">
             <div class="w-10 h-10 rounded-xl bg-[#F34455]/10 flex items-center justify-center text-[#F34455] dark:text-[#FD94B4]">
                <Beaker class="w-5 h-5" />
@@ -112,7 +112,7 @@
     </div>
 
     <!-- Info Section: Always Visible but themed darker -->
-    <div class="glass-card p-6 bg-[#131d1a] border-[#FD94B4]/10 rounded-2xl shadow-xl">
+    <div class="glass-card p-4 sm:p-6 bg-[#131d1a] border-[#FD94B4]/10 rounded-2xl shadow-xl">
       <div class="flex items-center gap-3 mb-4">
         <Info class="w-5 h-5 text-[#FD94B4]" />
         <h3 class="text-lg font-bold text-white leading-none pt-1">Hệ thống TeamVoice AI</h3>

@@ -1,24 +1,25 @@
 <template>
   <div class="h-full flex flex-col space-y-8 pb-10">
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div class="flex items-center gap-5">
-          <button @click="$router.back()" class="p-3 bg-white dark:bg-[#131d1a] rounded-2xl border border-black/5 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/10 transition-all shadow-sm group">
+    <div class="flex flex-col gap-4 sm:gap-6">
+        <div class="flex items-center gap-3 sm:gap-5">
+          <button @click="$router.back()" class="p-2.5 sm:p-3 bg-white dark:bg-[#131d1a] rounded-2xl border border-black/5 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/10 transition-all shadow-sm group shrink-0">
             <ArrowLeft class="w-5 h-5 text-slate-400 group-hover:text-[#F34455] transition-colors" />
           </button>
-          <div>
+          <div class="min-w-0">
             <div class="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 mb-1.5">
               <span>Analytics</span> <ChevronRight class="w-3.5 h-3.5 opacity-30" /> <span>Weekly Intelligence</span>
             </div>
-            <h1 class="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Báo cáo Tổng hợp Tuần</h1>
+            <h1 class="text-xl sm:text-3xl font-black text-slate-800 dark:text-white tracking-tight truncate">Báo cáo Tổng hợp Tuần</h1>
           </div>
         </div>
         
-        <div class="flex items-center gap-3">
-          <button @click="generateReport" class="flex items-center gap-2.5 px-6 py-3 bg-white dark:bg-[#131d1a] text-slate-600 dark:text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-white/5 transition-all border border-black/5 dark:border-white/10 shadow-sm">
+        <div class="flex items-center gap-2 sm:gap-3">
+          <button @click="generateReport" class="flex-1 sm:flex-none flex items-center justify-center gap-2 sm:gap-2.5 px-4 sm:px-6 py-3 bg-white dark:bg-[#131d1a] text-slate-600 dark:text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-white/5 transition-all border border-black/5 dark:border-white/10 shadow-sm">
             <RefreshCcw class="w-4 h-4" :class="{ 'animate-spin': isGenerating }" />
-            {{ isGenerating ? 'Đang tổng hợp...' : 'Làm mới báo cáo' }}
+            <span class="hidden sm:inline">{{ isGenerating ? 'Đang tổng hợp...' : 'Làm mới báo cáo' }}</span>
+            <span class="sm:hidden">{{ isGenerating ? 'Đang...' : 'Làm mới' }}</span>
           </button>
-          <button class="flex items-center gap-2.5 px-8 py-3 bg-gradient-to-tr from-[#FD94B4] to-[#F34455] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:shadow-[0_10px_20px_rgba(243,68,85,0.3)] transition-all active:scale-95">
+          <button class="flex-1 sm:flex-none flex items-center justify-center gap-2 sm:gap-2.5 px-4 sm:px-8 py-3 bg-gradient-to-tr from-[#FD94B4] to-[#F34455] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:shadow-[0_10px_20px_rgba(243,68,85,0.3)] transition-all active:scale-95">
             <Download class="w-4 h-4" /> Xuất PDF
           </button>
         </div>
@@ -43,10 +44,10 @@
       </button>
     </div>
 
-    <div v-else class="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 overflow-y-auto pb-20 custom-scrollbar pr-2">
+    <div v-else class="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8 overflow-y-auto pb-20 custom-scrollbar sm:pr-2">
       <!-- Left Column: Overall & Progress -->
-      <div class="lg:col-span-1 space-y-8">
-        <div class="glass-card p-10 bg-white dark:bg-[#131d1a] border-black/5 dark:border-teal-500/20 rounded-[2.5rem] shadow-xl relative overflow-hidden group">
+      <div class="lg:col-span-1 space-y-4 sm:space-y-8">
+        <div class="glass-card p-5 sm:p-10 bg-white dark:bg-[#131d1a] border-black/5 dark:border-teal-500/20 rounded-2xl sm:rounded-[2.5rem] shadow-xl relative overflow-hidden group">
           <div class="absolute -top-10 -right-10 w-40 h-40 bg-teal-500/5 rounded-full blur-3xl group-hover:bg-teal-500/10 transition-colors"></div>
           <h3 class="text-[10px] font-black uppercase tracking-[0.25em] text-teal-600 dark:text-teal-400 mb-6 flex items-center gap-3">
             <div class="w-7 h-7 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-500">
@@ -57,15 +58,15 @@
           <p class="text-slate-600 dark:text-slate-300 leading-[1.8] font-bold text-base transition-colors group-hover:text-slate-900 dark:group-hover:text-white">{{ report.overall_summary }}</p>
         </div>
 
-        <div class="glass-card p-10 bg-white dark:bg-[#131d1a] border-black/5 dark:border-white/5 rounded-[2.5rem] shadow-xl flex flex-col items-center">
-          <h3 class="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500 mb-8 w-full text-center">Tiến độ tuần cuối</h3>
-          <div class="relative w-48 h-48 mx-auto">
+        <div class="glass-card p-5 sm:p-10 bg-white dark:bg-[#131d1a] border-black/5 dark:border-white/5 rounded-2xl sm:rounded-[2.5rem] shadow-xl flex flex-col items-center">
+          <h3 class="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500 mb-6 sm:mb-8 w-full text-center">Tiến độ tuần cuối</h3>
+          <div class="relative w-36 h-36 sm:w-48 sm:h-48 mx-auto">
              <svg class="w-full h-full transform -rotate-90 filter drop-shadow-[0_0_10px_rgba(243,68,85,0.2)]" viewBox="0 0 100 100">
                <circle class="text-slate-100 dark:text-white/5 stroke-current" stroke-width="10" cx="50" cy="50" r="40" fill="transparent"></circle>
                <circle class="text-[#F34455] stroke-current transition-all duration-[2000ms] ease-out" stroke-width="10" stroke-linecap="round" cx="50" cy="50" r="40" fill="transparent" :stroke-dasharray="251.2" :stroke-dashoffset="251.2 - (251.2 * (report.team_progress || 0)) / 100"></circle>
              </svg>
              <div class="absolute inset-0 flex flex-col items-center justify-center">
-               <span class="text-5xl font-black text-slate-800 dark:text-white tracking-tighter">{{ report.team_progress }}%</span>
+               <span class="text-4xl sm:text-5xl font-black text-slate-800 dark:text-white tracking-tighter">{{ report.team_progress }}%</span>
              </div>
           </div>
           <div class="mt-8 flex gap-4 w-full">
@@ -80,7 +81,7 @@
           </div>
         </div>
 
-        <div class="glass-card p-10 bg-white dark:bg-amber-500/5 border-amber-500/20 rounded-[2.5rem] shadow-xl border-dashed">
+        <div class="glass-card p-5 sm:p-10 bg-white dark:bg-amber-500/5 border-amber-500/20 rounded-2xl sm:rounded-[2.5rem] shadow-xl border-dashed">
           <h3 class="text-[10px] font-black uppercase tracking-[0.25em] text-amber-600 mb-6 flex items-center gap-3">
             <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500">
               <Lightbulb class="w-4 h-4" />
@@ -97,23 +98,23 @@
       </div>
 
       <!-- Right Column: Member Details -->
-      <div class="lg:col-span-2 space-y-6">
+      <div class="lg:col-span-2 space-y-4 sm:space-y-6">
         <div class="flex items-center gap-4 mb-2">
           <h3 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-widest text-sm">Báo cáo theo thành viên</h3>
           <div class="flex-1 h-px bg-gradient-to-r from-black/5 to-transparent dark:from-white/10"></div>
         </div>
         
-        <div v-for="member in report.member_summaries" :key="member.user_id" class="glass-card p-8 bg-white dark:bg-[#131d1a] border-black/5 dark:border-white/5 rounded-[2.5rem] shadow-lg hover:shadow-xl transition-all relative overflow-hidden group">
+        <div v-for="member in report.member_summaries" :key="member.user_id" class="glass-card p-5 sm:p-8 bg-white dark:bg-[#131d1a] border-black/5 dark:border-white/5 rounded-2xl sm:rounded-[2.5rem] shadow-lg hover:shadow-xl transition-all relative overflow-hidden group">
            <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-150 transition-transform duration-1000">
               <User class="w-32 h-32 text-[#FD94B4]" />
            </div>
            
-           <div class="flex items-center gap-5 mb-8 border-b border-black/5 dark:border-white/5 pb-8 relative z-10">
-             <div class="w-16 h-16 rounded-[1.5rem] bg-gradient-to-tr from-[#FD94B4] to-[#F34455] shadow-lg shadow-[#F34455]/20 flex items-center justify-center font-black text-2xl text-white group-hover:rotate-6 transition-transform">
+           <div class="flex items-center gap-4 sm:gap-5 mb-6 sm:mb-8 border-b border-black/5 dark:border-white/5 pb-6 sm:pb-8 relative z-10">
+             <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-[1.5rem] bg-gradient-to-tr from-[#FD94B4] to-[#F34455] shadow-lg shadow-[#F34455]/20 flex items-center justify-center font-black text-xl sm:text-2xl text-white group-hover:rotate-6 transition-transform">
                {{ member.user_name?.charAt(0).toUpperCase() || 'M' }}
              </div>
              <div>
-               <h4 class="font-black text-slate-800 dark:text-white text-xl tracking-tight">{{ member.user_name || 'Member Unit #' + member.user_id }}</h4>
+               <h4 class="font-black text-slate-800 dark:text-white text-base sm:text-xl tracking-tight">{{ member.user_name || 'Member Unit #' + member.user_id }}</h4>
                <div class="flex items-center gap-2 mt-1">
                  <span class="text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-500/10">Verified Sync</span>
                  <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Team Consultant</span>
@@ -121,7 +122,7 @@
              </div>
            </div>
 
-           <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mt-4 relative z-10">
+           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10 mt-4 relative z-10">
               <div class="space-y-4">
                 <h5 class="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                   <CheckSquare class="w-3.5 h-3.5" /> Accomplishments

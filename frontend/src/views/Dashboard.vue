@@ -1,19 +1,19 @@
 <template>
   <div class="space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-1">Projects</h1>
-        <p class="text-slate-500 dark:text-slate-400">Quản lý các dự án và theo dõi quá trình báo cáo.</p>
+        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-1">Projects</h1>
+        <p class="text-sm sm:text-base text-slate-500 dark:text-slate-400">Quản lý các dự án và theo dõi quá trình báo cáo.</p>
       </div>
-      <button @click="showModal = true" class="bg-gradient-to-r from-[#FD94B4] to-[#F34455] hover:from-[#F34455] hover:to-[#EC1D3C] text-white px-5 py-2.5 rounded-xl font-medium shadow-[0_0_15px_rgba(243,68,85,0.4)] hover:shadow-[0_0_20px_rgba(243,68,85,0.6)] hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-2">
-        <Plus class="w-5 h-5" />
+      <button @click="showModal = true" class="bg-gradient-to-r from-[#FD94B4] to-[#F34455] hover:from-[#F34455] hover:to-[#EC1D3C] text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium text-sm shadow-[0_0_15px_rgba(243,68,85,0.4)] hover:shadow-[0_0_20px_rgba(243,68,85,0.6)] hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 w-auto active:scale-95 self-start sm:self-auto">
+        <Plus class="w-4 h-4 sm:w-5 sm:h-5" />
         Tạo dự án mới
       </button>
     </div>
 
     <!-- Stats summary -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="glass-card p-6 bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-2xl shadow-sm">
+    <div class="flex sm:grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 overflow-x-auto no-scrollbar pb-2 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div class="glass-card w-[200px] sm:w-auto shrink-0 p-4 sm:p-6 bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-[1.25rem] sm:rounded-2xl shadow-sm">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 rounded-xl bg-[#F34455]/10 flex items-center justify-center text-[#FD94B4]">
             <LayoutGrid class="w-6 h-6" />
@@ -25,7 +25,7 @@
         </div>
       </div>
       
-      <div class="glass-card p-6 bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-2xl shadow-sm">
+      <div class="glass-card w-[200px] sm:w-auto shrink-0 p-4 sm:p-6 bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-[1.25rem] sm:rounded-2xl shadow-sm">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 rounded-xl bg-[#FFDAE9]/10 flex items-center justify-center text-[#FFDAE9]">
             <Mic class="w-6 h-6" />
@@ -37,7 +37,7 @@
         </div>
       </div>
 
-      <div class="glass-card p-6 bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-2xl shadow-sm">
+      <div class="glass-card w-[200px] sm:w-auto shrink-0 p-4 sm:p-6 bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-[1.25rem] sm:rounded-2xl shadow-sm">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 rounded-xl bg-[#FD94B4]/10 flex items-center justify-center text-[#FD94B4]">
             <FileText class="w-6 h-6" />
@@ -52,7 +52,7 @@
 
     <!-- Project List -->
     <div class="mt-8">
-      <div v-if="projectStore.loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-if="projectStore.loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <div v-for="i in 3" :key="i" class="glass-card h-48 animate-pulse bg-white/40 dark:bg-white/5 border-black/5 dark:border-[#FD94B4]/10 rounded-2xl"></div>
       </div>
       
@@ -65,7 +65,7 @@
         <button @click="showModal = true" class="px-8 py-3 bg-[#F34455]/10 hover:bg-[#F34455]/20 text-[#F34455] dark:text-[#FD94B4] rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all border border-[#F34455]/20">Bắt đầu ngay</button>
       </div>
 
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <div v-for="project in projectStore.projects" :key="project.id" 
              @click="project.is_member !== false ? $router.push(`/projects/${project.id}`) : null" 
              :class="['glass-card glass-card-hover p-0 cursor-pointer group bg-white dark:bg-[#131d1a] border-black/5 dark:border-[#FD94B4]/10 rounded-[2rem] overflow-hidden relative shadow-md transition-all',
@@ -89,12 +89,12 @@
                     <MoreVertical class="w-4 h-4" />
                   </button>
                   <!-- Project Menu Dropdown -->
-                  <div v-if="activeMenuId === project.id" class="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-[#131d1a] border border-black/10 dark:border-white/10 rounded-2xl shadow-2xl z-20 py-2 overflow-hidden animate-fade-in">
-                    <button @click.stop="renameProject(project)" class="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors">
-                      <Edit2 class="w-3.5 h-3.5 text-[#FD94B4]" /> Đổi tên
+                  <div v-if="activeMenuId === project.id" class="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#131d1a] border border-black/10 dark:border-white/10 rounded-2xl shadow-2xl z-20 py-2 overflow-hidden animate-fade-in">
+                    <button @click.stop="openRenameModal(project)" class="w-full text-left px-4 py-3 text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
+                      <Edit2 class="w-4 h-4 text-[#FD94B4]" /> Đổi tên
                     </button>
-                    <button @click.stop="deleteProject(project)" class="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 transition-colors border-t border-black/5 dark:border-white/5">
-                      <Trash2 class="w-3.5 h-3.5" /> Xóa Dự Án
+                    <button @click.stop="openDeleteModal(project)" class="w-full text-left px-4 py-3 text-[11px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-500/10 flex items-center gap-3 transition-colors border-t border-black/5 dark:border-white/5">
+                      <Trash2 class="w-4 h-4" /> Xóa Dự Án
                     </button>
                   </div>
                 </div>
@@ -125,8 +125,8 @@
     </div>
 
     <!-- Create Project Modal -->
-    <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in">
-      <div class="glass-card w-full max-w-md p-8 bg-white dark:bg-[#131d1a] border-black/10 dark:border-[#FD94B4]/20 rounded-[2.5rem] shadow-2xl relative overflow-hidden animate-scale-in">
+    <div v-if="showModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-md sm:p-4 animate-fade-in">
+      <div class="glass-card w-full sm:max-w-md p-6 sm:p-8 bg-white dark:bg-[#131d1a] border-black/10 dark:border-[#FD94B4]/20 rounded-t-[2rem] sm:rounded-[2.5rem] shadow-2xl relative overflow-hidden animate-scale-in max-h-[90vh] overflow-y-auto">
         <div class="absolute -top-10 -right-10 w-32 h-32 bg-[#F34455]/10 rounded-full blur-3xl"></div>
         
         <div class="flex items-center gap-4 mb-8">
@@ -182,12 +182,42 @@
       </div>
     </div>
 
+    <!-- Rename Project Modal -->
+    <div v-if="showRenameModal" class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+       <div class="glass-card w-full sm:max-w-md bg-white dark:bg-[#131d1a] border-black/10 dark:border-white/10 rounded-t-[2rem] sm:rounded-3xl p-6 sm:p-8 relative shadow-2xl animate-scale-in">
+          <h3 class="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight mb-6 flex items-center gap-3">
+             <Edit2 class="w-6 h-6 text-[#FD94B4]" /> Đổi tên dự án
+          </h3>
+          <input v-model="newProjectName" @keyup.enter="confirmRenameProject" type="text"
+                 class="w-full bg-slate-50 dark:bg-[#0c1210] border border-black/5 dark:border-white/5 rounded-2xl px-5 py-4 outline-none focus:border-[#F34455]/50 text-slate-800 dark:text-white transition-all font-bold shadow-inner mb-8" />
+          <div class="flex gap-3">
+             <button @click="showRenameModal = false" class="flex-1 py-4.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs transition-colors">Hủy</button>
+             <button @click="confirmRenameProject" class="flex-1 py-4.5 bg-gradient-to-r from-[#FD94B4] to-[#F34455] text-white rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs shadow-md hover:shadow-[0_10px_20px_rgba(243,68,85,0.3)] hover:-translate-y-0.5 transition-all active:scale-95">Lưu lại</button>
+          </div>
+       </div>
+    </div>
+
+    <!-- Delete Project Modal -->
+    <div v-if="showDeleteModal" class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+       <div class="glass-card w-full sm:max-w-md bg-white dark:bg-[#131d1a] border-rose-500/20 rounded-t-[2rem] sm:rounded-3xl p-6 sm:p-8 relative shadow-2xl animate-scale-in">
+          <h3 class="text-xl sm:text-2xl font-black text-rose-500 tracking-tight mb-4 flex items-center gap-3">
+             <AlertTriangle class="w-6 h-6 flex-shrink-0" /> Xóa dự án?
+          </h3>
+          <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-8 font-medium">
+            Bạn có chắc muốn xóa dự án <strong class="text-rose-500 dark:text-rose-400 border-b border-rose-500/30">"{{ projectToDelete?.name }}"</strong>? Hành động này không thể hoàn tác và sẽ xóa toàn bộ dữ liệu báo cáo bên trong.
+          </p>
+          <div class="flex gap-3">
+             <button @click="showDeleteModal = false" class="flex-1 py-4.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs transition-colors">Hủy</button>
+             <button @click="confirmDeleteProject" class="flex-1 py-4.5 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs shadow-md hover:shadow-[0_10px_20px_rgba(244,63,94,0.3)] hover:-translate-y-0.5 transition-all active:scale-95">Xóa ngay</button>
+          </div>
+       </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { Plus, LayoutGrid, Mic, FileText, FolderOpen, Folders, MoreVertical, Edit2, Trash2, Check, Lock } from 'lucide-vue-next';
+import { LayoutGrid, Folders, Lock, MoreVertical, Edit2, Trash2, Plus, Users, Search, AlertTriangle, Mic, FileText, FolderOpen, Check } from 'lucide-vue-next';
 import { useProjectStore } from '../stores/projectStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useUserStore } from '../stores/userStore';
@@ -222,7 +252,7 @@ const createProject = async () => {
     showModal.value = false;
     newProject.value = { name: '', description: '', color: 'teal', user_ids: [] };
   } catch (err) {
-    alert("Có lỗi khi tạo dự án!");
+    notificationStore.addNotification("Có lỗi khi tạo dự án!", "error");
   } finally {
     isCreating.value = false;
   }
@@ -249,27 +279,47 @@ const handleOutsideClick = (e) => {
   }
 };
 
-const renameProject = async (project) => {
-  const newName = prompt('Nhập tên mới cho dự án:', project.name);
-  if (!newName || newName === project.name) return;
-  try {
-    await projectStore.updateProject(project.id, { name: newName });
-    notificationStore.addNotification('Đổi tên dự án thành công!');
-  } catch (err) {
-    notificationStore.addNotification('Lỗi khi đổi tên dự án', 'error');
-  }
+const showRenameModal = ref(false);
+const showDeleteModal = ref(false);
+const projectToRename = ref(null);
+const projectToDelete = ref(null);
+const newProjectName = ref('');
+
+const openRenameModal = (project) => {
+  projectToRename.value = project;
+  newProjectName.value = project.name;
+  showRenameModal.value = true;
   activeMenuId.value = null;
 };
 
-const deleteProject = async (project) => {
-  if (!confirm(`Bạn có chắc muốn xóa dự án "${project.name}"? Hành động này không thể hoàn tác.`)) return;
+const confirmRenameProject = async () => {
+  if (!newProjectName.value.trim() || newProjectName.value === projectToRename.value.name) {
+    showRenameModal.value = false;
+    return;
+  }
   try {
-    await projectStore.deleteProject(project.id);
+    await projectStore.updateProject(projectToRename.value.id, { name: newProjectName.value.trim() });
+    notificationStore.addNotification('Đổi tên dự án thành công!');
+    showRenameModal.value = false;
+  } catch (err) {
+    notificationStore.addNotification('Lỗi khi đổi tên dự án', 'error');
+  }
+};
+
+const openDeleteModal = (project) => {
+  projectToDelete.value = project;
+  showDeleteModal.value = true;
+  activeMenuId.value = null;
+};
+
+const confirmDeleteProject = async () => {
+  try {
+    await projectStore.deleteProject(projectToDelete.value.id);
     notificationStore.addNotification('Xóa dự án thành công!');
+    showDeleteModal.value = false;
   } catch (err) {
     const message = err.response?.data?.message || 'Lỗi khi xóa dự án';
     notificationStore.addNotification(message, 'error', 5000);
   }
-  activeMenuId.value = null;
 };
 </script>

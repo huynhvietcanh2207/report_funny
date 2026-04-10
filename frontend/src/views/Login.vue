@@ -72,9 +72,13 @@ import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { Mic, Mail, Lock } from 'lucide-vue-next';
 import { useAuthStore } from '../stores/authStore';
+import { useConfigStore } from '../stores/configStore';
+import { useProjectStore } from '../stores/projectStore';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const configStore = useConfigStore();
+const projectStore = useProjectStore();
 const error = ref(null);
 
 const form = reactive({
@@ -86,6 +90,11 @@ const handleLogin = async () => {
   error.value = null;
   try {
     await authStore.login(form);
+    // Fetch config and projects immediately after login
+    await Promise.all([
+      configStore.fetchConfig(),
+      projectStore.fetchProjects()
+    ]);
     router.push('/');
   } catch (err) {
     error.value = err.message || 'Lỗi đăng nhập. Vui lòng thử lại.';

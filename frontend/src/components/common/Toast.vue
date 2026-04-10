@@ -1,8 +1,8 @@
 <template>
-  <div class="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
+  <div class="fixed top-4 left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-auto sm:top-auto sm:bottom-6 sm:right-6 z-[100] flex flex-col gap-3 pointer-events-none w-[calc(100%-2rem)] sm:w-auto max-w-md">
     <transition-group name="notification">
       <div v-for="notification in store.notifications" :key="notification.id"
-           class="pointer-events-auto min-w-[280px] max-w-md p-4 rounded-2xl bg-[#131d1a]/80 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-4 relative group overflow-hidden">
+           class="pointer-events-auto w-full sm:min-w-[280px] sm:max-w-md p-4 rounded-2xl bg-[#131d1a]/90 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-4 relative group overflow-hidden">
         
         <!-- Progress bar background -->
         <div class="absolute bottom-0 left-0 h-0.5 bg-[#FD94B4]/20 w-full"></div>
@@ -49,12 +49,23 @@ const store = useNotificationStore();
 
 .notification-enter-from {
   opacity: 0;
-  transform: translateX(30px) scale(0.9);
+  transform: translateY(-20px) scale(0.95);
 }
 
 .notification-leave-to {
   opacity: 0;
-  transform: translateX(30px) translateY(-10px) scale(0.9);
+  transform: translateY(-20px) scale(0.95);
+}
+
+@media (min-width: 640px) {
+  .notification-enter-from {
+    opacity: 0;
+    transform: translateX(30px) scale(0.9);
+  }
+  .notification-leave-to {
+    opacity: 0;
+    transform: translateX(30px) translateY(-10px) scale(0.9);
+  }
 }
 
 @keyframes progress {

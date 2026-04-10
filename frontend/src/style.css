@@ -25,10 +25,18 @@
 
   body {
     @apply bg-slate-50 text-slate-900 antialiased transition-colors duration-300;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .dark body {
     @apply bg-[#0c1210] text-[#f8fafc];
+  }
+
+  /* Ensure inputs don't zoom on iOS */
+  @media screen and (max-width: 1023px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
   }
 }
 
@@ -60,4 +68,37 @@
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-[#FD94B4] to-[#F34455];
   }
+}
+
+/* ============================================ */
+/* Mobile-specific utilities */
+/* ============================================ */
+
+/* Hide scrollbar for mobile horizontal scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Mobile card hover - use active state instead */
+@media (max-width: 1023px) {
+  .glass-card-hover {
+    transition: transform 0.15s ease;
+  }
+  .glass-card-hover:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Scale-in animation for modals */
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
