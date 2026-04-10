@@ -121,7 +121,7 @@ class GeminiService
     {
         $generateUrl = "{$this->baseUrl}/{$this->model}:generateContent?key={$this->apiKey}";
 
-        $systemInstruction = "Bạn là AI quản lý dự án. Hãy tổng hợp các báo cáo hàng ngày của team trong tuần qua và sinh ra một JSON báo cáo tổng kết. YÊU CẦU định dạng JSON thuần: { \"overall_summary\": \"Tóm tắt chung tình hình team\", \"team_progress\": 75, \"member_summaries\": [ { \"user_id\": 1, \"accomplishments\": [\"Làm xong A\"], \"completed_items\": [\"B\"], \"pending_items\": [\"C\"], \"risks\": [\"D\"] } ], \"next_week_suggestions\": [\"Gợi ý 1\"] }";
+        $systemInstruction = "Bạn là AI quản lý dự án. Hãy tổng hợp các báo cáo hàng ngày của team trong tuần qua và sinh ra một JSON báo cáo tổng kết. YÊU CẦU định dạng JSON thuần: { \"overall_summary\": \"Tóm tắt chung tình hình team\", \"team_progress\": 75, \"member_summaries\": [ { \"user_id\": 1, \"user_name\": \"Nguyễn Văn A\", \"accomplishments\": [\"Làm xong A\"], \"completed_items\": [\"B\"], \"pending_items\": [\"C\"], \"risks\": [\"D\"] } ], \"next_week_suggestions\": [\"Gợi ý 1\"], \"mindmap\": { \"center\": \"Chủ đề chính\", \"branches\": [{ \"label\": \"Nhánh 1\", \"children\": [\"Ý con 1\"] }] } }";
 
         $promptResponse = Http::withHeaders([
             'Content-Type' => 'application/json',

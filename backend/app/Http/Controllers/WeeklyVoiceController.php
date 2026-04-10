@@ -33,7 +33,7 @@ class WeeklyVoiceController extends Controller
 
     public function show(WeeklyVoice $weeklyVoice)
     {
-        return response()->json($weeklyVoice->load(['voiceEntries']));
+        return response()->json($weeklyVoice->load(['voiceEntries', 'weeklyReport']));
     }
 
     /**

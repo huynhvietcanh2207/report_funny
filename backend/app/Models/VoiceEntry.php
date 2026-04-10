@@ -21,4 +21,9 @@ class VoiceEntry extends Model
     {
         return $this->belongsTo(WeeklyVoice::class);
     }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

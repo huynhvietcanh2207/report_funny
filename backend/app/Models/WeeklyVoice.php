@@ -17,4 +17,9 @@ class WeeklyVoice extends Model
     {
         return $this->hasMany(VoiceEntry::class);
     }
+
+    public function weeklyReport()
+    {
+        return $this->hasOne(WeeklyReport::class);
+    }
 }
