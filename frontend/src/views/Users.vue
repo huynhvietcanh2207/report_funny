@@ -64,7 +64,7 @@
       </div>
       <div v-else-if="userStore.users.length === 0" class="p-20 text-center flex flex-col items-center gap-4">
         <div class="w-16 h-16 bg-slate-50 dark:bg-white/5 rounded-full flex items-center justify-center text-slate-300">
-          <Users class="w-8 h-8" />
+          <UsersIcon class="w-8 h-8" />
         </div>
         <p class="text-slate-500 font-medium italic">Chưa có nhân viên nào trong hệ thống.</p>
       </div>
@@ -78,7 +78,7 @@
       </div>
       <div v-else-if="userStore.users.length === 0" class="glass-card p-12 text-center flex flex-col items-center gap-4 bg-white dark:bg-[#131d1a] rounded-2xl">
         <div class="w-16 h-16 bg-slate-50 dark:bg-white/5 rounded-full flex items-center justify-center text-slate-300">
-          <Users class="w-8 h-8" />
+          <UsersIcon class="w-8 h-8" />
         </div>
         <p class="text-slate-500 font-medium italic text-sm">Chưa có nhân viên nào.</p>
       </div>
@@ -249,9 +249,15 @@
   </div>
 </template>
 
+<script>
+export default {
+  name: 'UserManagement'
+}
+</script>
+
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
-import { UserPlus, Edit2, Trash2, X, Search, Filter, Eye, Mail, Calendar, Shield, LayoutGrid, ChevronRight, AlertTriangle } from 'lucide-vue-next';
+import { UserPlus, Edit2, Trash2, X, Search, Filter, Eye, Mail, Calendar, Shield, LayoutGrid, ChevronRight, AlertTriangle, Users as UsersIcon } from 'lucide-vue-next';
 import { useUserStore } from '../stores/userStore';
 import { useAuthStore } from '../stores/authStore';
 import { useNotificationStore } from '../stores/notificationStore';

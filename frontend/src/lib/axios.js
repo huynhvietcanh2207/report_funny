@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toRaw } from 'vue';
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || (window.location.origin + '/api'),
@@ -10,9 +11,12 @@ const api = axios.create({
 
 // Optionally add interceptors here to handle auth tokens later
 api.interceptors.request.use(config => {
+    // Detach headers from Vue reactivity to prevent infinite loops in Axios 1.x
+    const headers = toRaw(config.headers);
     const token = localStorage.getItem('token');
+    
     if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+        headers.set('Authorization', `Bearer ${token}`);
     }
 
     const apiKeysStr = localStorage.getItem('gemini_api_keys');
@@ -20,15 +24,15 @@ api.interceptors.request.use(config => {
         try {
             const keys = JSON.parse(apiKeysStr);
             if (Array.isArray(keys) && keys.length > 0) {
-                config.headers['X-Gemini-Api-Key'] = keys[0];
+                headers.set('X-Gemini-Api-Key', keys[0]);
             }
         } catch (e) {
-            config.headers['X-Gemini-Api-Key'] = apiKeysStr;
+            headers.set('X-Gemini-Api-Key', apiKeysStr);
         }
     }
 
     const model = localStorage.getItem('gemini_model') || 'gemini-2.5-flash';
-    config.headers['X-Gemini-Model'] = model;
+    headers.set('X-Gemini-Model', model);
 
     return config;
 });
