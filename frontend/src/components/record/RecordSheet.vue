@@ -30,20 +30,39 @@
 
       <div :class="['p-6 relative z-10 flex-1 overflow-y-auto max-h-[70vh]', (isRecording || isUploading) ? 'overflow-hidden' : '']">
         <!-- Analysis/Saving State -->
-        <div v-if="isUploading" class="flex flex-col items-center justify-center py-10">
-          <div class="relative w-20 h-20 mb-6 flex items-center justify-center">
-            <div class="absolute inset-0 rounded-full border-4 border-[#0c1210]"></div>
-            <div class="absolute inset-0 rounded-full border-4 border-t-[#F34455] border-r-[#FD94B4] border-b-[#FFDAE9] border-l-transparent animate-spin"></div>
-            <div class="absolute inset-0 flex items-center justify-center bg-[#131d1a] rounded-full scale-90 shadow-[0_0_15px_rgba(253,148,180,0.3)]">
-              <Sparkles class="w-8 h-8 text-[#FD94B4] animate-pulse" />
+        <div v-if="isUploading" class="flex flex-col items-center justify-center py-8">
+
+          <!-- Circular Progress Ring -->
+          <div class="relative w-24 h-24 mb-5 flex items-center justify-center">
+            <svg class="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
+              <circle cx="48" cy="48" r="40" stroke="#1a2a25" stroke-width="6" fill="none"/>
+              <circle cx="48" cy="48" r="40" stroke="url(#progressGrad)" stroke-width="6" fill="none"
+                stroke-linecap="round"
+                :stroke-dasharray="251.2"
+                :stroke-dashoffset="251.2 - (251.2 * analysisPercent / 100)"
+                style="transition: stroke-dashoffset 0.6s ease"
+              />
+              <defs>
+                <linearGradient id="progressGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#FD94B4"/>
+                  <stop offset="100%" stop-color="#F34455"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span class="text-lg font-black text-white leading-none">{{ analysisPercent }}</span>
+              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">%</span>
             </div>
           </div>
-          
-          <h4 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#FD94B4] to-[#F34455] mb-2">
+
+          <h4 class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#FD94B4] to-[#F34455] mb-1">
             {{ activeTab === 'note' ? 'Đang lưu ghi chú...' : 'Đang phân tích dữ liệu' }}
           </h4>
-          
-          <div v-if="activeTab !== 'note'" class="flex flex-col gap-2 w-full max-w-sm mt-4">
+
+          <!-- Elapsed timer -->
+          <p class="text-xs text-slate-500 mb-4">⏱ {{ elapsedTime }}s</p>
+
+          <div v-if="activeTab !== 'note'" class="flex flex-col gap-2 w-full max-w-sm">
             <div v-for="(step, idx) in currentSteps" :key="idx" class="flex items-center gap-3 text-sm">
               <div :class="[
                 'w-5 h-5 rounded-full flex items-center justify-center text-xs transition-colors duration-500',
@@ -54,6 +73,10 @@
               </div>
               <span :class="currentStep >= idx ? 'text-slate-200 font-medium' : 'text-slate-400'">{{ step }}</span>
             </div>
+            <!-- Real-time status message -->
+            <p v-if="statusMessage" class="mt-2 text-[10px] font-black uppercase tracking-widest text-[#FD94B4] animate-pulse text-center">
+              {{ statusMessage }}
+            </p>
           </div>
         </div>
 
@@ -208,14 +231,27 @@ const modalTitle = computed(() => {
 })
 
 const audioSteps = [
-  'Đang khởi tạo AI...',
-  'Đang xử lý dữ liệu âm thanh...',
-  'Đang phân tích nội dung...',
-  'Hoàn tất dữ liệu & Trích xuất'
+  'Khởi tạo & Chuẩn bị file...',
+  'Đang tải / chuyển đổi âm thanh...',
+  'AI đang phân tích nội dung...',
+  'Trích xuất & Lưu kết quả'
 ]
 
 const currentSteps = computed(() => audioSteps)
 const currentStep = ref(0)
+const statusMessage = ref('')
+const analysisPercent = ref(0)     // 0-100 progress for the ring
+const elapsedTime = ref(0)         // seconds elapsed during analysis
+
+let elapsedTimer = null
+
+const startElapsedTimer = () => {
+  elapsedTime.value = 0
+  elapsedTimer = setInterval(() => { elapsedTime.value++ }, 1000)
+}
+const stopElapsedTimer = () => {
+  if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null }
+}
 
 let mediaRecorder = null
 let audioChunks = []
@@ -342,7 +378,7 @@ const handleFileChange = (e) => {
 const getApiConfig = () => {
   return {
     apiKey: configStore.getActiveKey(),
-    modelName: configStore.activeModel || 'gemini-2.5-flash'
+    modelName: configStore.activeModel || 'gemini-3.5-flash'
   }
 }
 
@@ -372,108 +408,107 @@ const sharedSubmitAudio = async (blob, source) => {
   stopRecorderResources()
   isUploading.value = true
   currentStep.value = 0
-  
-  let success = false
-  let attempts = 0
-  const maxAttempts = configStore.apiKeys.length || 1
+  statusMessage.value = ''
+  analysisPercent.value = 0
+  startElapsedTimer()
 
-  while (!success && attempts < maxAttempts) {
-    try {
-      const { apiKey, modelName } = getApiConfig()
-      if (!apiKey) throw new Error('Vui lòng cấu hình API Key trong Settings.')
+  try {
+    const { apiKey, modelName } = getApiConfig()
+    if (!apiKey) throw new Error('Vui lòng cấu hình API Key trong Settings.')
 
-      const aiResult = await analyzeMeeting(blob, apiKey, modelName, (progress) => {
-        if (progress < 30) currentStep.value = 0
-        else if (progress < 60) currentStep.value = 1
+    const fallbackKeys = configStore.apiKeys.filter(k => k !== apiKey)
+
+    const aiResult = await analyzeMeeting(
+      blob,
+      apiKey,
+      modelName,
+      (progress, msg) => {
+        analysisPercent.value = Math.min(progress, 95)
+        if (progress < 20) currentStep.value = 0
+        else if (progress < 45) currentStep.value = 1
         else if (progress < 90) currentStep.value = 2
         else currentStep.value = 3
-      })
+        if (msg) statusMessage.value = msg
+      },
+      fallbackKeys
+    )
 
-      const formData = new FormData()
-      formData.append('audio', blob, blob.name || `voice_${Date.now()}.webm`)
-      formData.append('project_id', Number(props.projectId))
-      formData.append('source', source)
-      formData.append('ai_result', JSON.stringify(aiResult))
+    analysisPercent.value = 97
+    currentStep.value = 3
+    statusMessage.value = 'Đang lưu vào hệ thống...'
 
-      const response = await api.post('/voices', formData)
-      
-      currentStep.value = 4
-      setTimeout(() => {
-        emit('success', response.data)
-        isUploading.value = false
-        close()
-      }, 1000)
-      success = true
-    } catch (err) {
-      const errorMsg = err.message || ''
-      const isFailoverTrigger = errorMsg === 'QUOTA_EXHAUSTED' || errorMsg === 'SERVICE_BUSY' || errorMsg.includes('bận') || errorMsg.includes('hết lượt')
-      
-      if (isFailoverTrigger && attempts < maxAttempts - 1) {
-        configStore.rotateKey()
-        attempts++
-        // Show status in UI
-        const statusMsg = errorMsg === 'QUOTA_EXHAUSTED' ? 'API Key hết hạn mức. Đang đổi Key dự phòng...' : 'AI đang bận. Đang thử Key dự phòng...'
-        // Temporarily override the current step text by setting it to a special "loading" state if needed
-        // For now, we reuse currentStep logic or just log
-        console.warn(`${statusMsg} (Lần thử ${attempts}/${maxAttempts})`)
-        continue
-      }
-      
-      console.error('Upload error detail:', err.response?.data || err.message)
-      alert('Lỗi: ' + (err.response?.data?.message || err.message || 'Hệ thống AI đang gặp sự cố. Vui lòng thử lại sau.'))
+    const formData = new FormData()
+    formData.append('audio', blob, blob.name || `voice_${Date.now()}.webm`)
+    formData.append('project_id', Number(props.projectId))
+    formData.append('source', source)
+    formData.append('ai_result', JSON.stringify(aiResult))
+
+    const response = await api.post('/voices', formData)
+
+    analysisPercent.value = 100
+    currentStep.value = 4
+    statusMessage.value = 'Hoàn tất!'
+    setTimeout(() => {
+      emit('success', response.data)
+      stopElapsedTimer()
       isUploading.value = false
-      break
-    }
+      close()
+    }, 800)
+  } catch (err) {
+    console.error('Audio submit error:', err.response?.data || err.message)
+    alert('Lỗi phân tích: ' + (err.response?.data?.message || err.message || 'Hệ thống AI đang gặp sự cố. Vui lòng thử lại sau.'))
+    stopElapsedTimer()
+    isUploading.value = false
+    statusMessage.value = ''
+    analysisPercent.value = 0
   }
 }
 
 const submitNote = async () => {
   if (!noteContent.value.trim()) return
   isUploading.value = true
-  
-  let success = false
-  let attempts = 0
-  const maxAttempts = configStore.apiKeys.length || 1
+  statusMessage.value = ''
+  analysisPercent.value = 0
+  startElapsedTimer()
 
-  while (!success && attempts < maxAttempts) {
-    try {
-      const { apiKey, modelName } = getApiConfig()
-      if (!apiKey) throw new Error('Vui lòng cấu hình API Key trong Settings.')
+  try {
+    const { apiKey, modelName } = getApiConfig()
+    if (!apiKey) throw new Error('Vui lòng cấu hình API Key trong Settings.')
 
-      const aiResult = await analyzeText(noteContent.value, apiKey, modelName, (progress) => {
-        // Simple progress for note analysis
-      })
+    statusMessage.value = 'Đang phân tích nội dung...'
 
-      const formData = new FormData()
-      formData.append('project_id', Number(props.projectId))
-      formData.append('source', 'manual')
-      formData.append('transcript', noteContent.value)
-      formData.append('title', aiResult.title || ('Ghi chú: ' + noteContent.value.substring(0, 30) + '...'))
-      formData.append('ai_result', JSON.stringify(aiResult))
+    const aiResult = await analyzeText(
+      noteContent.value,
+      apiKey,
+      modelName,
+      (progress, msg) => { if (msg) statusMessage.value = msg }
+    )
 
-      const response = await api.post('/voices', formData)
-      
-      setTimeout(() => {
-        emit('success', response.data)
-        isUploading.value = false
-        close()
-      }, 500)
-      success = true
-    } catch (err) {
-      const errorMsg = err.message || ''
-      const isFailoverTrigger = errorMsg === 'QUOTA_EXHAUSTED' || errorMsg === 'SERVICE_BUSY' || errorMsg.includes('bận') || errorMsg.includes('hết lượt')
+    statusMessage.value = 'Đang lưu vào hệ thống...'
 
-      if (isFailoverTrigger && attempts < maxAttempts - 1) {
-        configStore.rotateKey()
-        attempts++
-        continue
-      }
+    const formData = new FormData()
+    formData.append('project_id', Number(props.projectId))
+    formData.append('source', 'manual')
+    formData.append('transcript', noteContent.value)
+    formData.append('title', aiResult.title || ('Ghi chú: ' + noteContent.value.substring(0, 30) + '...'))
+    formData.append('ai_result', JSON.stringify(aiResult))
 
-      console.error('Note analysis error:', err.response?.data || err.message)
-      alert('Lỗi: ' + (err.response?.data?.message || err.message || 'Hệ thống AI đang gặp sự cố.'))
+    const response = await api.post('/voices', formData)
+
+    setTimeout(() => {
+      emit('success', response.data)
+      stopElapsedTimer()
       isUploading.value = false
-      break
-    }
+      statusMessage.value = ''
+      close()
+    }, 500)
+  } catch (err) {
+    console.error('Note analysis error:', err.response?.data || err.message)
+    alert('Lỗi: ' + (err.response?.data?.message || err.message || 'Hệ thống AI đang gặp sự cố.'))
+    stopElapsedTimer()
+    isUploading.value = false
+    statusMessage.value = ''
+    analysisPercent.value = 0
   }
 }
 
@@ -515,7 +550,10 @@ const drawWaveform = () => {
   }
 }
 
-onUnmounted(() => stopRecorderResources())
+onUnmounted(() => {
+  stopRecorderResources()
+  stopElapsedTimer()
+})
 defineExpose({ open, close })
 </script>
 

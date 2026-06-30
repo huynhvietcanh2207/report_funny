@@ -12,10 +12,10 @@ class GeminiService
     protected $model;
     protected $baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-    public function __construct($apiKey = null, $model = 'gemini-2.5-flash')
+    public function __construct($apiKey = null, $model = 'gemini-3.5-flash')
     {
         $this->apiKey = $apiKey ?: env('GEMINI_API_KEY');
-        $this->model = $model ?: 'gemini-2.5-flash';
+        $this->model = $model ?: 'gemini-3.5-flash';
     }
 
     public function analyzeAudio($audioFilePath)
@@ -25,94 +25,105 @@ class GeminiService
             throw new \Exception("Audio file not found.");
         }
 
-        // Upload to Gemini File API first because audio files usually need separate upload
         $mimeType = mime_content_type($fullPath);
         $fileSize = filesize($fullPath);
 
+        // ── Upload to Gemini File API ─────────────────────────────────────────
         $uploadUrl = "https://generativelanguage.googleapis.com/upload/v1beta/files?key={$this->apiKey}";
 
         $uploadResponse = Http::withHeaders([
-            'X-Goog-Upload-Protocol' => 'raw',
-            'X-Goog-Upload-Command' => 'upload, finalize',
+            'X-Goog-Upload-Protocol'              => 'raw',
+            'X-Goog-Upload-Command'               => 'upload, finalize',
             'X-Goog-Upload-Header-Content-Length' => $fileSize,
-            'X-Goog-Upload-Header-Content-Type' => $mimeType,
-            'Content-Type' => $mimeType,
-        ])->send('POST', $uploadUrl, [
-                    'body' => file_get_contents($fullPath)
-                ]);
+            'X-Goog-Upload-Header-Content-Type'   => $mimeType,
+            'Content-Type'                        => $mimeType,
+        ])->timeout(300)->send('POST', $uploadUrl, [
+            'body' => file_get_contents($fullPath)
+        ]);
 
         if (!$uploadResponse->successful()) {
             throw new \Exception("Gemini Upload Failed: " . $uploadResponse->body());
         }
 
-        $fileUri = $uploadResponse->json('file.uri');
+        $fileUri  = $uploadResponse->json('file.uri');
         $fileName = $uploadResponse->json('file.name');
 
-        // Wait for file to be processed (ACTIVE state)
-        // Especially needed for audio files which take a few seconds
+        // ── Poll until ACTIVE (max 3 minutes for long recordings) ─────────────
         $fileStatusUrl = "https://generativelanguage.googleapis.com/v1beta/{$fileName}?key={$this->apiKey}";
         $attempts = 0;
+        $maxAttempts = 180; // 3 minutes at ~1s intervals
         $state = 'PROCESSING';
-        while ($attempts < 60) {
+
+        while ($attempts < $maxAttempts) {
             $statusResponse = Http::get($fileStatusUrl);
             $state = $statusResponse->json('state');
-            if ($statusResponse->successful() && $state === 'ACTIVE') {
-                break;
-            }
-            if ($state === 'FAILED') {
-                throw new \Exception("Gemini File Processing Failed.");
-            }
+            if ($statusResponse->successful() && $state === 'ACTIVE') break;
+            if ($state === 'FAILED') throw new \Exception("Gemini File Processing Failed.");
             sleep(1);
             $attempts++;
         }
 
         if ($state !== 'ACTIVE') {
-            throw new \Exception("Gemini File Processing Timeout (Still $state after 60s).");
+            throw new \Exception("Gemini File Processing Timeout (Still {$state} after {$maxAttempts}s).");
         }
 
+        // ── Generate analysis ─────────────────────────────────────────────────
         $generateUrl = "{$this->baseUrl}/{$this->model}:generateContent?key={$this->apiKey}";
 
-        $systemInstruction = "Bạn là AI chuyên phân tích báo cáo công việc thời gian thực trong môi trường doanh nghiệp. Phân tích file ghi âm/báo cáo dưới đây và trả về định dạng JSON thuần túy (KHÔNG có markdown block như ```json). Định dạng YẾU CẦU: { \"title\": \"Tiêu đề tự đặt < 60 ký tự\", \"summary\": \"Tóm tắt 3-5 câu\", \"transcript\": \"Chép lại chi tiết nội dung (dịch sang tiếng Việt nếu cần)\", \"key_points\": [\"point 1\"], \"decisions\": [{\"content\":\"...\",\"owner\":\"...\"}], \"action_items\": [{\"task\":\"...\",\"priority\":\"high|medium|low\",\"owner\":\"...\",\"deadline\":\"...\",\"status\":\"pending\"}], \"risks\": [\"...\"], \"progress\": 65, \"tags\": [\"tag1\"] }";
+        $systemInstruction = <<<'PROMPT'
+Bạn là AI phân tích báo cáo công việc chuyên nghiệp trong doanh nghiệp Việt Nam.
+NHIỆM VỤ: Nghe nội dung file ghi âm và trích xuất thông tin theo cấu trúc.
+QUY TẮC BẮT BUỘC:
+- Trả lời hoàn toàn bằng tiếng Việt.
+- Chỉ trả về JSON thuần túy. Không có markdown, không có giải thích.
+- Điền đầy đủ tất cả các trường. Dùng mảng rỗng [] nếu không có dữ liệu.
+- progress là số nguyên 0-100 ước tính % hoàn thành công việc được đề cập.
+
+SCHEMA JSON BẮT BUỘC:
+{
+  "title": "string (tối đa 60 ký tự)",
+  "summary": "string (3-5 câu tóm tắt)",
+  "transcript": "string (chép lại toàn bộ lời thoại, dịch sang tiếng Việt nếu cần)",
+  "key_points": ["string"],
+  "decisions": [{"content": "string", "owner": "string"}],
+  "action_items": [{"task": "string", "priority": "high|medium|low", "owner": "string", "deadline": "string", "status": "pending"}],
+  "risks": ["string"],
+  "progress": 0,
+  "tags": ["string"],
+  "mindmap": {
+    "center": "string",
+    "branches": [{"label": "string", "children": ["string"]}]
+  }
+}
+Mindmap phải có 3-5 nhánh chính, mỗi nhánh 2-4 ý con.
+PROMPT;
 
         $promptResponse = Http::withHeaders([
             'Content-Type' => 'application/json',
-        ])->post($generateUrl, [
-                    'system_instruction' => [
-                        'parts' => [
-                            ['text' => $systemInstruction]
-                        ]
-                    ],
-                    'contents' => [
-                        [
-                            'role' => 'user',
-                            'parts' => [
-                                [
-                                    'file_data' => [
-                                        'mime_type' => $mimeType,
-                                        'file_uri' => $fileUri
-                                    ]
-                                ],
-                                [
-                                    'text' => 'Báo cáo này chứa những nội dung công việc gì? Hãy làm theo instructions.'
-                                ]
-                            ]
-                        ]
-                    ],
-                    'generationConfig' => [
-                        'temperature' => 0.2,
-                        'response_mime_type' => 'application/json'
-                    ]
-                ]);
+        ])->timeout(120)->post($generateUrl, [
+            'system_instruction' => [
+                'parts' => [['text' => $systemInstruction]]
+            ],
+            'contents' => [[
+                'role'  => 'user',
+                'parts' => [
+                    ['file_data' => ['mime_type' => $mimeType, 'file_uri' => $fileUri]],
+                    ['text'      => 'Phân tích file ghi âm này và trả về JSON theo đúng schema. Chỉ trả về JSON.']
+                ]
+            ]],
+            'generationConfig' => [
+                'temperature'        => 0.15,
+                'response_mime_type' => 'application/json'
+            ]
+        ]);
 
         if (!$promptResponse->successful()) {
             throw new \Exception("Gemini Generate Failed: " . $promptResponse->body());
         }
 
         $jsonText = $promptResponse->json('candidates.0.content.parts.0.text');
-
-        // Sometimes the AI still includes markdown block, clean it up
-        $jsonText = preg_replace('/```json\s*/', '', $jsonText);
-        $jsonText = preg_replace('/```\s*/', '', $jsonText);
+        $jsonText = preg_replace('/^```json\s*/i', '', trim($jsonText));
+        $jsonText = preg_replace('/```\s*$/i', '', $jsonText);
 
         return json_decode(trim($jsonText), true);
     }
@@ -121,33 +132,62 @@ class GeminiService
     {
         $generateUrl = "{$this->baseUrl}/{$this->model}:generateContent?key={$this->apiKey}";
 
-        $systemInstruction = "Bạn là AI quản lý dự án. Hãy tổng hợp các báo cáo hàng ngày của team trong tuần qua và sinh ra một JSON báo cáo tổng kết. YÊU CẦU định dạng JSON thuần: { \"overall_summary\": \"Tóm tắt chung tình hình team\", \"team_progress\": 75, \"member_summaries\": [ { \"user_id\": 1, \"user_name\": \"Nguyễn Văn A\", \"accomplishments\": [\"Làm xong A\"], \"completed_items\": [\"B\"], \"pending_items\": [\"C\"], \"risks\": [\"D\"] } ], \"next_week_suggestions\": [\"Gợi ý 1\"], \"mindmap\": { \"center\": \"Chủ đề chính\", \"branches\": [{ \"label\": \"Nhánh 1\", \"children\": [\"Ý con 1\"] }] } }";
+        $systemInstruction = <<<'PROMPT'
+Bạn là AI quản lý dự án chuyên nghiệp trong doanh nghiệp Việt Nam.
+NHIỆM VỤ: Tổng hợp các báo cáo hàng ngày của team trong tuần và sinh báo cáo tổng kết.
+QUY TẮC BẮT BUỘC:
+- Trả lời hoàn toàn bằng tiếng Việt.
+- Chỉ trả về JSON thuần túy. Không có markdown, không có giải thích.
+- Điền đầy đủ tất cả các trường. Dùng mảng rỗng [] nếu không có dữ liệu.
+- team_progress là số nguyên 0-100 đánh giá tổng thể tiến độ team.
+- member_summaries phải liệt kê đầy đủ tất cả thành viên có báo cáo.
+
+SCHEMA JSON BẮT BUỘC:
+{
+  "overall_summary": "string (tóm tắt 3-5 câu về tình hình chung của team trong tuần)",
+  "team_progress": 0,
+  "member_summaries": [
+    {
+      "user_id": 0,
+      "user_name": "string",
+      "accomplishments": ["string"],
+      "completed_items": ["string"],
+      "pending_items": ["string"],
+      "risks": ["string"]
+    }
+  ],
+  "next_week_suggestions": ["string"],
+  "mindmap": {
+    "center": "string (chủ đề tổng tuần)",
+    "branches": [{"label": "string", "children": ["string"]}]
+  }
+}
+Mindmap phải có 3-5 nhánh chính, mỗi nhánh 2-4 ý con.
+PROMPT;
 
         $promptResponse = Http::withHeaders([
             'Content-Type' => 'application/json',
-        ])->post($generateUrl, [
-                    'system_instruction' => [
-                        'parts' => [['text' => $systemInstruction]]
-                    ],
-                    'contents' => [
-                        [
-                            'role' => 'user',
-                            'parts' => [['text' => "Dưới đây là các bản ghi chép giọng nói trong tuần:\n\n" . $compiledTranscripts]]
-                        ]
-                    ],
-                    'generationConfig' => [
-                        'temperature' => 0.2,
-                        'response_mime_type' => 'application/json'
-                    ]
-                ]);
+        ])->timeout(120)->post($generateUrl, [
+            'system_instruction' => [
+                'parts' => [['text' => $systemInstruction]]
+            ],
+            'contents' => [[
+                'role'  => 'user',
+                'parts' => [['text' => "Dưới đây là toàn bộ báo cáo giọng nói của team trong tuần này. Hãy tổng hợp và trả về JSON theo đúng schema:\n\n" . $compiledTranscripts]]
+            ]],
+            'generationConfig' => [
+                'temperature'        => 0.15,
+                'response_mime_type' => 'application/json'
+            ]
+        ]);
 
         if (!$promptResponse->successful()) {
             throw new \Exception("Gemini Generate Failed: " . $promptResponse->body());
         }
 
         $jsonText = $promptResponse->json('candidates.0.content.parts.0.text');
-        $jsonText = preg_replace('/```json\s*/', '', $jsonText);
-        $jsonText = preg_replace('/```\s*/', '', $jsonText);
+        $jsonText = preg_replace('/^```json\s*/i', '', trim($jsonText));
+        $jsonText = preg_replace('/```\s*$/i', '', $jsonText);
 
         return json_decode(trim($jsonText), true);
     }

@@ -41,7 +41,7 @@ class WeeklyReportController extends Controller
             $apiKeys = array_filter($apiKeys);
 
             $dbModel = \App\Models\Config::where('key', 'gemini_model')->first()?->value;
-            $model = $dbModel ?? $request->header('X-Gemini-Model') ?? 'gemini-2.5-flash';
+            $model = $dbModel ?? $request->header('X-Gemini-Model') ?? 'gemini-3.5-flash';
 
             if (empty($apiKeys)) {
                 return response()->json(['message' => 'Hệ thống chưa được cấu hình API Key. Vui lòng liên hệ Admin.'], 400);

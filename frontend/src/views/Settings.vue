@@ -148,11 +148,16 @@ const themeOptions = [
 
 const inputKeys = ref('');
 const savedKeysArray = ref([]);
-const selectedModel = ref('gemini-2.5-flash');
+const selectedModel = ref('gemini-3.5-flash');
 const isSaving = ref(false);
 
 const availableModels = [
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Recommended)' },
+  { id: 'gemini-3.5-live-translate-preview', label: 'Gemini 3.5 Live Translate (New)' },
+  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Live (New)' },
+  { id: 'gemini-2.5-flash-native-audio-preview-12-2025', label: 'Gemini 2.5 Flash Native Audio Dialog (New)' },
+  { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Recommended)' },
+  { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
   { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
   { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (Legacy)' },
   { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (Legacy)' },
@@ -167,7 +172,7 @@ const fetchSettings = async () => {
     const keys = response.data.gemini_api_keys || [];
     savedKeysArray.value = keys;
     inputKeys.value = keys.join('\n');
-    selectedModel.value = response.data.gemini_model || 'gemini-2.5-flash';
+    selectedModel.value = response.data.gemini_model || 'gemini-3.5-flash';
   } catch (err) {
     console.error('Failed to fetch settings:', err);
     notificationStore.addNotification('Lỗi tải cấu hình API', 'error');

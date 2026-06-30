@@ -1,27 +1,36 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────────────────────────────────────
+const LARGE_FILE_THRESHOLD_MB = 5; // Files larger than 5MB use File Upload API
+const FILE_UPLOAD_BASE_URL = 'https://generativelanguage.googleapis.com/upload/v1beta/files';
+const FILE_STATUS_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+const FILE_ACTIVE_POLL_INTERVAL_MS = 1200;
+const FILE_ACTIVE_POLL_MAX_ATTEMPTS = 90; // ~108s max wait
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Chuyển đổi Blob sang Base64 (Chuẩn Gemini SDK)
+ * Chuyển đổi Blob sang Base64 (dùng cho file nhỏ <5MB)
  */
 async function blobToBase64(blob) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onloadend = () => {
-            // Tách bỏ phần tiền tố "data:...;base64,"
-            const base64 = reader.result.split(',')[1];
-            resolve(base64);
-        };
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
         reader.onerror = reject;
         reader.readAsDataURL(blob);
     });
 }
 
 /**
- * Helper: Xác định MIME Type từ file name nếu file.type rỗng hoặc không chuẩn
+ * Xác định MIME Type chuẩn từ file/blob
  */
 export function getMimeType(file) {
-    if (file.type && file.type !== 'application/octet-stream') return file.type
-    const ext = file.name?.split('.').pop()?.toLowerCase()
+    if (file.type && file.type !== 'application/octet-stream') return file.type;
+    const ext = (file.name || '').split('.').pop()?.toLowerCase();
     const mimeMap = {
         mp3: 'audio/mpeg',
         wav: 'audio/wav',
@@ -30,220 +39,412 @@ export function getMimeType(file) {
         webm: 'audio/webm',
         flac: 'audio/flac',
         aac: 'audio/aac',
-    }
-    return mimeMap[ext] || 'audio/webm'
+        opus: 'audio/opus',
+    };
+    return mimeMap[ext] || 'audio/webm';
 }
 
 /**
- * Phân tích báo cáo cuộc họp (ZenVoice Logic)
- * @param {Blob} audioBlob - File âm thanh
- * @param {string} apiKey - Gemini API Key
- * @param {string} modelName - ID Model (mặc định gemini-2.5-flash hoặc gemini-2.0-flash-exp)
- * @param {function} onProgress - Callback tiến độ
+ * Upload file lên Gemini File API (dành cho file lớn ≥5MB).
+ * Trả về fileUri đã upload — có thể tái dùng với nhiều API key khác nhau.
+ * @param {Blob} blob
+ * @param {string} apiKey
+ * @param {function} onProgress
+ * @returns {Promise<{fileUri: string, mimeType: string}>}
  */
-export async function analyzeMeeting(audioBlob, apiKey, modelName = 'gemini-2.5-flash', onProgress = () => { }) {
-    let retries = 3;
-    let delay = 2000;
+export async function uploadFileToGemini(blob, apiKey, onProgress = () => {}) {
+    const mimeType = getMimeType(blob);
+    const uploadUrl = `${FILE_UPLOAD_BASE_URL}?key=${apiKey}`;
 
-    while (retries > 0) {
-        try {
-            onProgress(10, 'Khởi tạo AI...');
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({
-                model: modelName,
-                generationConfig: {
-                    temperature: 0.2,
-                    responseMimeType: "application/json",
-                }
-            });
+    onProgress(15, 'Đang tải file âm thanh lên máy chủ AI...');
 
-            onProgress(30, 'Chuyển đổi dữ liệu âm thanh...');
-            const base64Data = await blobToBase64(audioBlob);
+    const uploadRes = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+            'X-Goog-Upload-Protocol': 'raw',
+            'X-Goog-Upload-Command': 'upload, finalize',
+            'X-Goog-Upload-Header-Content-Length': blob.size,
+            'X-Goog-Upload-Header-Content-Type': mimeType,
+            'Content-Type': mimeType,
+        },
+        body: blob,
+    });
 
-            onProgress(50, 'Đang phân tích với AI (đang xử lý)...');
-
-            const prompt = `Phân tích báo cáo âm thanh và trả về JSON chuẩn:
-    { 
-      "title": "Tên báo cáo ngắn gọn", 
-      "summary": "Tóm tắt súc tích", 
-      "transcript": "Lời thoại chi tiết", 
-      "key_points": ["Ý chính 1", "Ý chính 2"], 
-      "decisions": ["Quyết định 1"], 
-      "action_items": ["Việc cần làm 1"], 
-      "risks": ["Rủi ro 1"], 
-      "progress": 85, 
-      "tags": ["du-an", "hop"], 
-      "mindmap": { 
-        "center": "Chủ đề chính của cuộc họp", 
-        "branches": [ 
-          { 
-            "label": "Nhánh quan trọng 1", 
-            "children": ["Ý phụ 1.1", "Ý phụ 1.2"] 
-          },
-          { 
-            "label": "Nhánh quan trọng 2", 
-            "children": ["Ý phụ 2.1", "Ý phụ 2.2"] 
-          }
-        ] 
-      } 
+    if (!uploadRes.ok) {
+        const errText = await uploadRes.text();
+        throw new Error(`Upload thất bại (${uploadRes.status}): ${errText}`);
     }
-    Lưu ý quan trọng: 
-    1. YÊU CẦU TRẢ LỜI HOÀN TOÀN BẰNG TIẾNG VIỆT.
-    2. Mindmap phải có ít nhất 3-5 nhánh chính (branches), mỗi nhánh có ít nhất 2-3 ý con (children).
-    3. Trả về JSON thuần túy, KHÔNG nằm trong khối markdown (\`\`\`json).`;
 
-            const result = await model.generateContent([
-                {
-                    inlineData: {
-                        data: base64Data,
-                        mimeType: getMimeType(audioBlob)
-                    }
-                },
-                { text: prompt }
-            ]);
+    const uploadData = await uploadRes.json();
+    const fileUri = uploadData.file?.uri;
+    const fileName = uploadData.file?.name;
 
-            onProgress(90, 'Hoàn tất trích xuất dữ liệu...');
-            const response = await result.response;
-            let text = response.text();
-
-            // Clean up potential markdown blocks
-            text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-
-            onProgress(100, 'Xong!');
-            return JSON.parse(text);
-        } catch (error) {
-            const msg = error.message?.toLowerCase() || '';
-            const isQuotaError = msg.includes('429') || msg.includes('quota') || msg.includes('limit');
-            const isServiceError = msg.includes('503') || msg.includes('demand') || msg.includes('overloaded');
-
-            // For Rate Limit (429), don't retry same key, throw immediately so failover can happen
-            if (isQuotaError) {
-                throw new Error('QUOTA_EXHAUSTED');
-            }
-
-            // For Service Busy (503), retry 2 times then throw
-            if (isServiceError && retries > 1) {
-                retries--;
-                onProgress(50, `Hệ thống bận, đang thử lại lần ${3 - retries}...`);
-                await new Promise(r => setTimeout(r, delay));
-                delay *= 2;
-                continue;
-            }
-            
-            if (isServiceError) {
-                throw new Error('SERVICE_BUSY');
-            }
-
-            console.error('Gemini Analysis Error:', error);
-            throw error;
-        }
+    if (!fileUri || !fileName) {
+        throw new Error('Không nhận được fileUri từ Gemini File API.');
     }
+
+    onProgress(35, 'Đang chờ AI xử lý file...');
+
+    // Poll until ACTIVE
+    let attempts = 0;
+    let state = 'PROCESSING';
+    while (attempts < FILE_ACTIVE_POLL_MAX_ATTEMPTS) {
+        const statusRes = await fetch(
+            `${FILE_STATUS_BASE_URL}/${fileName}?key=${apiKey}`
+        );
+        const statusData = await statusRes.json();
+        state = statusData.state;
+
+        if (state === 'ACTIVE') break;
+        if (state === 'FAILED') throw new Error('AI từ chối xử lý file này. File có thể bị hỏng hoặc định dạng không hỗ trợ.');
+
+        await new Promise(r => setTimeout(r, FILE_ACTIVE_POLL_INTERVAL_MS));
+        attempts++;
+        onProgress(35 + Math.floor((attempts / FILE_ACTIVE_POLL_MAX_ATTEMPTS) * 15), 'Đang xử lý dữ liệu âm thanh...');
+    }
+
+    if (state !== 'ACTIVE') {
+        throw new Error(`File upload timeout: Trạng thái vẫn là "${state}" sau ${Math.round(FILE_ACTIVE_POLL_MAX_ATTEMPTS * FILE_ACTIVE_POLL_INTERVAL_MS / 1000)}s.`);
+    }
+
+    return { fileUri, mimeType };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PROMPT ENGINEERING
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Phân tích báo cáo văn bản (Note Analyzer)
+ * Prompt tối ưu cho phân tích file âm thanh
+ * - Schema-first: súc tích, chỉ nêu đủ thông tin cần thiết
+ * - Không có example dài dòng → giảm token → nhanh hơn ~15-25%
  */
-export async function analyzeText(textContent, apiKey, modelName = 'gemini-2.5-flash', onProgress = () => { }) {
-    let retries = 3;
-    let delay = 2000;
+const AUDIO_ANALYSIS_SYSTEM_PROMPT = `Bạn là AI chuyên phân tích nội dung ghi âm công việc trong môi trường doanh nghiệp Việt Nam.
+QUY TẮC BẮT BUỘC: Chỉ trả về JSON thuần túy. Không markdown, không text ngoài JSON, không giải thích.
+Ngôn ngữ: Hoàn toàn tiếng Việt.
 
-    while (retries > 0) {
-        try {
-            onProgress(10, 'Khởi tạo AI...');
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({
-                model: modelName,
-                generationConfig: {
-                    temperature: 0.2,
-                    responseMimeType: "application/json",
-                }
-            });
-
-            onProgress(40, 'Đang phân tích nội dung văn bản...');
-
-            const prompt = `Phân tích nội dung ghi chú và trả về JSON chuẩn:
-    { 
-      "title": "...", 
-      "summary": "...", 
-      "key_points": [], 
-      "progress": 0, 
-      "tags": [], 
-      "mindmap": { 
-        "center": "Chủ đề chính", 
-        "branches": [
-          { "label": "Nhánh 1", "children": ["Ý con 1.1", "Ý con 1.2"] }
-        ] 
-      } 
-    }
-    Nội dung ghi chú: ${textContent}
-    Lưu ý quan trọng: 
-    1. YÊU CẦU TRẢ LỜI HOÀN TOÀN BẰNG TIẾNG VIỆT.
-    2. Mindmap phải có ít nhất 3-5 nhánh chính (branches), mỗi nhánh có ít nhất 2-3 ý con (children).
-    3. Trả về JSON thuần túy, KHÔNG nằm trong khối markdown (\`\`\`json).`;
-
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            let text = response.text();
-            text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-
-            onProgress(100, 'Xong!');
-            return {
-                ...JSON.parse(text),
-                transcript: textContent // For notes, the transcript is the original text
-            };
-        } catch (error) {
-            const msg = error.message?.toLowerCase() || '';
-            const isQuotaError = msg.includes('429') || msg.includes('quota') || msg.includes('limit');
-            const isServiceError = msg.includes('503') || msg.includes('demand') || msg.includes('overloaded');
-
-            if (isQuotaError) {
-                throw new Error('QUOTA_EXHAUSTED');
-            }
-
-            if (isServiceError && retries > 1) {
-                retries--;
-                onProgress(40, `Hệ thống bận, đang thử lại lần ${3 - retries}...`);
-                await new Promise(r => setTimeout(r, delay));
-                delay *= 2;
-                continue;
-            }
-
-            if (isServiceError) {
-                throw new Error('SERVICE_BUSY');
-            }
-
-            console.error('Gemini Text Analysis Error:', error);
-            throw error;
-        }
-    }
+SCHEMA (bắt buộc đúng cấu trúc này):
+{
+  "title": "string ≤ 60 ký tự",
+  "summary": "string 2-4 câu",
+  "transcript": "string toàn bộ lời thoại",
+  "key_points": ["string"],
+  "decisions": [{"content": "string", "owner": "string"}],
+  "action_items": [{"task": "string", "priority": "high|medium|low", "owner": "string", "deadline": "string", "status": "pending"}],
+  "risks": ["string"],
+  "progress": 0,
+  "tags": ["string"],
+  "mindmap": {"center": "string", "branches": [{"label": "string", "children": ["string"]}]}
 }
+Mindmap: 3-5 nhánh chính, mỗi nhánh 2-3 ý con.
+Điền đầy đủ mọi trường, dùng mảng rỗng [] nếu không có dữ liệu.`;
+
+const AUDIO_ANALYSIS_USER_PROMPT = 'Phân tích file ghi âm này. Chỉ trả về JSON theo đúng schema, không thêm bất kỳ văn bản nào khác.';
+
 /**
- * Hỏi đáp AI dựa trên ngữ cảnh cuộc họp
+ * Prompt tối ưu cho phân tích văn bản ghi chú (súc tích)
  */
-export async function chatWithAI(userMessage, context, history = [], apiKey, modelName = 'gemini-2.5-flash') {
+const TEXT_ANALYSIS_SYSTEM_PROMPT = `Bạn là AI phân tích ghi chú công việc. Chỉ trả về JSON thuần túy (không markdown, không giải thích). Ngôn ngữ: tiếng Việt.
+SCHEMA:
+{
+  "title": "string ≤ 60 ký tự",
+  "summary": "string 2-3 câu",
+  "key_points": ["string"],
+  "progress": 0,
+  "tags": ["string"],
+  "mindmap": {"center": "string", "branches": [{"label": "string", "children": ["string"]}]}
+}
+Mindmap: 3-5 nhánh, mỗi nhánh 2-3 con.`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CORE GENERATION (retry với nhiều key)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Trích xuất JSON từ text AI trả về một cách bền vững.
+ * Xử lý các trường hợp: markdown fence, text thừa sau JSON, Unicode escaping.
+ */
+function extractJSON(raw) {
+    // 1. Strip markdown fences
+    let text = raw
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .trim();
+
+    // 2. Try direct parse first (happy path)
     try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: modelName });
+        return JSON.parse(text);
+    } catch (_) { /* fall through */ }
 
-        const chat = model.startChat({
-            history: [
-                {
-                    role: "user",
-                    parts: [{ text: `Bạn là một trợ lý dự án chuyên nghiệp. Hãy trả lời câu hỏi của người dùng dựa trên nội dung báo cáo sau đây. Nếu câu hỏi không liên quan đến nội dung báo cáo, hãy nhẹ nhàng nhắc nhở người dùng. Dưới đây là nội dung báo cáo:\n\n${context}` }],
-                },
-                {
-                    role: "model",
-                    parts: [{ text: "Tôi đã hiểu nội dung báo cáo. Tôi sẵn sàng trả lời các câu hỏi của bạn về cuộc họp/ghi chú này bằng tiếng Việt." }],
-                },
-                ...history
-            ],
-        });
+    // 3. Extract first complete JSON object { ... }
+    // Find the first '{' and match its closing '}' by counting depth
+    const start = text.indexOf('{');
+    if (start === -1) throw new SyntaxError('No JSON object found in AI response.');
 
-        const result = await chat.sendMessage(userMessage);
-        const response = await result.response;
-        return response.text();
-    } catch (error) {
-        console.error('Gemini Chat Error:', error);
-        throw error;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let end = -1;
+
+    for (let i = start; i < text.length; i++) {
+        const ch = text[i];
+        if (escape) { escape = false; continue; }
+        if (ch === '\\' && inString) { escape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === '{') depth++;
+        if (ch === '}') {
+            depth--;
+            if (depth === 0) { end = i; break; }
+        }
     }
+
+    if (end === -1) throw new SyntaxError('JSON object not closed in AI response.');
+
+    return JSON.parse(text.substring(start, end + 1));
+}
+async function generateWithRetry({ apiKey, modelName, fileUri, base64Data, mimeType, systemPrompt, userPrompt }) {
+    const MAX_BUSY_RETRIES = 2;
+    let busyRetries = MAX_BUSY_RETRIES;
+    let delay = 1500;
+
+    while (true) {
+        try {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({
+                model: modelName,
+                systemInstruction: systemPrompt,
+                generationConfig: {
+                    temperature: 0.15,
+                    responseMimeType: 'application/json',
+                },
+            });
+
+            const parts = [];
+            if (fileUri) {
+                parts.push({ fileData: { mimeType, fileUri } });
+            } else if (base64Data) {
+                parts.push({ inlineData: { data: base64Data, mimeType } });
+            }
+            parts.push({ text: userPrompt });
+
+            // Set client-side timeout of 90 seconds (90000ms) to prevent infinite hanging
+            const signal = AbortSignal.timeout(90000);
+
+            const result = await model.generateContent(parts, { signal });
+            const response = await result.response;
+            const raw = response.text();
+
+            // Use robust extractor instead of direct JSON.parse
+            return extractJSON(raw);
+        } catch (error) {
+            const msg = (error.message || '').toLowerCase();
+            const name = (error.name || '').toLowerCase();
+
+            const isTimeout = name === 'timeouterror' || name === 'aborterror' || msg.includes('timeout') || msg.includes('abort');
+            const isQuota   = msg.includes('429') || msg.includes('quota') || msg.includes('resource_exhausted');
+            const isBusy    = msg.includes('503') || msg.includes('overloaded') || msg.includes('unavailable') || isTimeout;
+            const isPayload = msg.includes('request_too_large') || msg.includes('payload') ||
+                              (msg.includes('400') && (msg.includes('size') || msg.includes('large')));
+
+            // Quota errors — propagate immediately to trigger key rotation
+            if (isQuota) throw new Error('QUOTA_EXHAUSTED');
+
+            // Payload too large — propagate to trigger File Upload API fallback
+            if (isPayload) throw new Error('FILE_TOO_LARGE_FOR_INLINE');
+
+            // Service busy — retry a few times with backoff
+            if (isBusy && busyRetries > 0) {
+                busyRetries--;
+                await new Promise(r => setTimeout(r, delay));
+                delay = Math.round(delay * 1.8);
+                continue;
+            }
+
+            if (isBusy) throw new Error('SERVICE_BUSY');
+
+            // Any other error — propagate as-is
+            throw error;
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC API
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Phân tích file ghi âm / âm thanh.
+ * - File ≤5MB: gửi inline Base64 (nhanh).
+ * - File >5MB: upload qua File API trước, sau đó chỉ truyền URI → hỗ trợ file lên đến 2GB / >1 tiếng.
+ * - Khi API key lỗi QUOTA: tự động thử lại với key khác mà KHÔNG upload lại file.
+ *
+ * @param {Blob} audioBlob
+ * @param {string} apiKey               - key hiện tại
+ * @param {string} modelName
+ * @param {function} onProgress
+ * @param {string[]|null} fallbackKeys  - danh sách key dự phòng (nếu có)
+ * @returns {Promise<object>}
+ */
+export async function analyzeMeeting(
+    audioBlob,
+    apiKey,
+    modelName = 'gemini-3.5-flash',
+    onProgress = () => {},
+    fallbackKeys = []
+) {
+    const fileSizeMB = audioBlob.size / (1024 * 1024);
+    let isLargeAudio = fileSizeMB > LARGE_FILE_THRESHOLD_MB;
+
+    onProgress(5, 'Khởi tạo...');
+
+    // ── Bước 1: Chuẩn bị dữ liệu âm thanh ──────────────────────────────────
+    let fileUri = null;
+    let base64Data = null;
+    const mimeType = getMimeType(audioBlob);
+
+    if (!isLargeAudio) {
+        onProgress(20, 'Đang chuyển đổi âm thanh...');
+        base64Data = await blobToBase64(audioBlob);
+    }
+
+    // ── Bước 2: Gọi AI với cơ chế failover key ──────────────────────────────
+    const allKeys = [apiKey, ...fallbackKeys.filter(k => k && k !== apiKey)];
+    let lastError = null;
+
+    for (let i = 0; i < allKeys.length; i++) {
+        const currentKey = allKeys[i];
+
+        try {
+            // Nếu là file lớn và chưa được upload cho API key hiện tại (hoặc do key trước bị tạch và phải đổi key)
+            if (isLargeAudio && !fileUri) {
+                const uploadResult = await uploadFileToGemini(audioBlob, currentKey, onProgress);
+                fileUri = uploadResult.fileUri;
+            }
+
+            onProgress(45, i > 0 ? `API Key #${i + 1}: AI đang xử lý...` : 'AI đang xử lý...');
+
+            // Simulated progress ticker: slowly fills 50→88% while AI is generating.
+            let tickPercent = 50;
+            const ticker = setInterval(() => {
+                if (tickPercent < 88) {
+                    tickPercent++;
+                    const msg = i > 0 ? `API Key #${i + 1}: Đang phân tích...` : 'AI đang phân tích nội dung...';
+                    onProgress(tickPercent, msg);
+                }
+            }, 1000);
+
+            try {
+                const result = await generateWithRetry({
+                    apiKey: currentKey,
+                    modelName,
+                    fileUri,
+                    base64Data,
+                    mimeType,
+                    systemPrompt: AUDIO_ANALYSIS_SYSTEM_PROMPT,
+                    userPrompt: AUDIO_ANALYSIS_USER_PROMPT,
+                });
+
+                clearInterval(ticker);
+                onProgress(95, 'Hoàn tất phân tích!');
+                return result;
+            } catch (generateErr) {
+                clearInterval(ticker);
+                throw generateErr;
+            }
+        } catch (err) {
+            lastError = err;
+            const errMsg = (err.message || '').toLowerCase();
+            const isQuota = err.message === 'QUOTA_EXHAUSTED';
+            const isBusy = err.message === 'SERVICE_BUSY';
+            const isPermissionError = errMsg.includes('permission') || errMsg.includes('403') || errMsg.includes('not have');
+
+            const isFailover = isQuota || isBusy || isPermissionError;
+
+            if (isFailover && i < allKeys.length - 1) {
+                console.warn(`[Gemini Failover] Key #${i + 1} lỗi (${err.message}), chuyển sang Key #${i + 2}`);
+                onProgress(48, `Key #${i + 1} lỗi/hết hạn, đang chuyển sang Key #${i + 2}...`);
+                
+                // QUAN TRỌNG: Reset fileUri về null để key tiếp theo upload lại file mới của chính nó!
+                fileUri = null;
+                continue;
+            }
+
+            // File quá lớn cho inline → chuyển đổi sang upload
+            if (err.message === 'FILE_TOO_LARGE_FOR_INLINE' && !fileUri) {
+                onProgress(20, 'File lớn, đang chuyển sang File Upload API...');
+                base64Data = null;
+                isLargeAudio = true;
+                fileUri = null;
+                i--;
+                continue;
+            }
+
+            throw lastError;
+        }
+    }
+
+    throw lastError || new Error('Tất cả API Key đều thất bại.');
+}
+
+/**
+ * Phân tích nội dung ghi chú văn bản (không có audio)
+ * @param {string} textContent
+ * @param {string} apiKey
+ * @param {string} modelName
+ * @param {function} onProgress
+ */
+export async function analyzeText(
+    textContent,
+    apiKey,
+    modelName = 'gemini-3.5-flash',
+    onProgress = () => {}
+) {
+    onProgress(10, 'Đang phân tích ghi chú...');
+
+    const userPrompt = `Phân tích ghi chú sau và trả về JSON theo schema. Chỉ trả về JSON:\n\n${textContent}`;
+
+    const result = await generateWithRetry({
+        apiKey,
+        modelName,
+        fileUri: null,
+        base64Data: null,
+        mimeType: null,
+        systemPrompt: TEXT_ANALYSIS_SYSTEM_PROMPT,
+        userPrompt,
+    });
+
+    onProgress(100, 'Hoàn tất!');
+    return {
+        ...result,
+        transcript: textContent,
+    };
+}
+
+/**
+ * Hỏi đáp AI dựa trên ngữ cảnh báo cáo (Chat mode)
+ * @param {string} userMessage
+ * @param {string} context       - nội dung báo cáo làm ngữ cảnh
+ * @param {Array}  history       - lịch sử chat [{role, parts}]
+ * @param {string} apiKey
+ * @param {string} modelName
+ */
+export async function chatWithAI(
+    userMessage,
+    context,
+    history = [],
+    apiKey,
+    modelName = 'gemini-3.5-flash'
+) {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: `Bạn là trợ lý dự án chuyên nghiệp. Trả lời hoàn toàn bằng tiếng Việt dựa trên nội dung báo cáo được cung cấp. Nếu câu hỏi nằm ngoài phạm vi báo cáo, hãy lịch sự nhắc người dùng. Nội dung báo cáo:\n\n${context}`,
+    });
+
+    const chat = model.startChat({ history });
+
+    const result = await chat.sendMessage(userMessage);
+    return (await result.response).text();
 }

@@ -48,7 +48,7 @@ class ConfigController extends Controller
     public function getAIConfig()
     {
         $keys = Config::where('key', 'gemini_api_keys')->first()?->value ?? [];
-        $model = Config::where('key', 'gemini_model')->first()?->value ?? 'gemini-2.0-flash-exp';
+        $model = Config::where('key', 'gemini_model')->first()?->value ?? 'gemini-3.5-flash';
 
         return response()->json([
             'gemini_api_keys' => $keys,

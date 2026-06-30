@@ -31,7 +31,7 @@ api.interceptors.request.use(config => {
         }
     }
 
-    const model = localStorage.getItem('gemini_model') || 'gemini-2.5-flash';
+    const model = localStorage.getItem('gemini_model') || 'gemini-3.5-flash';
     headers.set('X-Gemini-Model', model);
 
     return config;

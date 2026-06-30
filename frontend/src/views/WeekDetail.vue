@@ -234,17 +234,22 @@
                 </h3>
                 <div class="space-y-3 lg:space-y-4">
                   <div v-if="!activeEntry.action_items?.length" class="py-12 text-center text-slate-400 font-bold italic">Chưa xác định được việc cần làm.</div>
-                  <div v-else v-for="(item, i) in activeEntry.action_items" :key="i" class="p-4 lg:p-5 flex gap-4 lg:gap-5 bg-white dark:bg-[#0c1210] rounded-2xl lg:rounded-3xl border border-black/5 dark:border-white/5 hover:border-[#00f2fe]/30 transition-all shadow-sm group">
+                  <div v-else v-for="(item, i) in activeEntry.action_items" :key="i" 
+                       @click="toggleActionItem(i)"
+                       class="p-4 lg:p-5 flex gap-4 lg:gap-5 bg-white dark:bg-[#0c1210] rounded-2xl lg:rounded-3xl border border-black/5 dark:border-white/5 hover:border-[#00f2fe]/40 hover:shadow-md transition-all shadow-sm group cursor-pointer active:scale-[0.99] select-none">
                     <div class="w-6 h-6 lg:w-7 lg:h-7 rounded-xl border-2 border-[#00f2fe]/30 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#00f2fe]/10 transition-colors">
-                      <Check v-if="item.status === 'completed'" class="w-4 h-4 text-[#00f2fe]" />
+                      <Check v-if="(typeof item === 'object' && item.status === 'completed') || (typeof item === 'string' && false)" class="w-4 h-4 text-[#00f2fe]" />
                     </div>
                     <div class="flex-1 min-w-0">
-                      <p :class="['font-black text-sm mb-2 transition-all tracking-tight', item.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100']">
+                      <p :class="['font-black text-sm mb-2 transition-all tracking-tight', (typeof item === 'object' && item.status === 'completed') ? 'text-slate-400 line-through opacity-70' : 'text-slate-800 dark:text-slate-100']">
                         {{ typeof item === 'string' ? item : item.task }}
                       </p>
                       <div class="flex flex-wrap items-center gap-2 lg:gap-4 text-[9px] uppercase font-black tracking-widest text-slate-400" v-if="typeof item !== 'string'">
                         <span class="flex items-center gap-2 bg-slate-50 dark:bg-white/5 px-3 py-1 rounded-full border border-black/5 dark:border-white/5"><User class="w-3 h-3 text-[#00f2fe]" /> {{ item.owner || 'Global' }}</span>
                         <span v-if="item.deadline" class="flex items-center gap-2 text-[#F34455] bg-rose-500/5 px-3 py-1 rounded-full border border-rose-500/10"><Clock class="w-3 h-3" /> {{ item.deadline }}</span>
+                        <span :class="['px-2 py-0.5 rounded-full border text-[8px]', item.priority === 'high' ? 'bg-red-500/10 border-red-500/20 text-red-500' : (item.priority === 'medium' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500')]">
+                          {{ item.priority || 'medium' }}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -327,6 +332,12 @@
              <!-- Input Area -->
              <div class="mt-auto p-4 lg:p-6 bg-white dark:bg-[#131d1a] border-t border-black/5 dark:border-white/5 relative z-10">
                 <div class="relative flex items-center gap-2 lg:gap-3">
+                   <button v-if="chatMessages.length > 0" 
+                           @click="clearChatHistory"
+                           class="w-12 h-12 lg:w-14 lg:h-14 bg-slate-100 dark:bg-white/5 hover:bg-rose-500/10 dark:hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 rounded-2xl flex items-center justify-center border border-black/5 dark:border-white/5 transition-all shrink-0 active:scale-95" 
+                           title="Xoá lịch sử trò chuyện">
+                     <Trash2 class="w-5 h-5 lg:w-6 lg:h-6" />
+                   </button>
                    <div class="relative flex-1">
                       <input type="text" v-model="chatInput" @keyup.enter="handleSendMessage"
                              placeholder="Hỏi AI về cuộc họp này..." 
@@ -435,12 +446,27 @@ const suggestedQuestions = [
   "Có quyết định nào chưa rõ ràng?"
 ];
 
+const saveChatHistory = () => {
+  if (activeEntry.value && activeEntry.value.id) {
+    localStorage.setItem(`voice_chat_${activeEntry.value.id}`, JSON.stringify(chatMessages.value));
+  }
+};
+
+const clearChatHistory = () => {
+  if (activeEntry.value && activeEntry.value.id) {
+    localStorage.removeItem(`voice_chat_${activeEntry.value.id}`);
+    chatMessages.value = [];
+    notificationStore.addNotification('Đã xoá lịch sử trò chuyện.');
+  }
+};
+
 const handleSendMessage = async () => {
   if (!chatInput.value.trim() || isChatLoading.value || !activeEntry.value) return;
   
   const userMsg = chatInput.value.trim();
   chatInput.value = '';
   chatMessages.value.push({ role: 'user', content: userMsg });
+  saveChatHistory();
   
   isChatLoading.value = true;
   scrollToBottom();
@@ -454,11 +480,19 @@ const handleSendMessage = async () => {
     // Extract text context for AI
     const context = `Tiêu đề: ${activeEntry.value.title}\nTóm tắt: ${activeEntry.value.summary}\nNội dung chính: ${activeEntry.value.transcript}`;
     
-    const response = await chatWithAI(userMsg, context, [], apiKey, model);
+    // Build context history format: [{role: "user"|"model", parts: [{text: "..."}]}]
+    const history = chatMessages.value.slice(0, -1).map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
+    
+    const response = await chatWithAI(userMsg, context, history, apiKey, model);
     chatMessages.value.push({ role: 'assistant', content: response });
+    saveChatHistory();
     scrollToBottom();
   } catch (err) {
     chatMessages.value.push({ role: 'assistant', content: 'Xin lỗi, em gặp lỗi khi kết nối với AI: ' + err.message });
+    saveChatHistory();
   } finally {
     isChatLoading.value = false;
   }
@@ -477,10 +511,16 @@ const scrollToBottom = () => {
   });
 };
 
-watch(activeEntry, () => {
-  chatMessages.value = [];
+watch(activeEntry, (newVal) => {
   chatInput.value = '';
-});
+  if (newVal && newVal.id) {
+    const saved = localStorage.getItem(`voice_chat_${newVal.id}`);
+    chatMessages.value = saved ? JSON.parse(saved) : [];
+    scrollToBottom();
+  } else {
+    chatMessages.value = [];
+  }
+}, { immediate: true });
 
 onMounted(async () => {
   checkMobile();
@@ -564,6 +604,49 @@ const confirmDeleteEntry = async () => {
     showDeleteModal.value = false;
   } catch (err) {
     notificationStore.addNotification('Lỗi khi xóa bản ghi', 'error');
+  }
+};
+const toggleActionItem = async (index) => {
+  if (!activeEntry.value || !activeEntry.value.action_items) return;
+
+  const items = [...activeEntry.value.action_items];
+  const item = items[index];
+
+  // Convert string item to object if necessary
+  if (typeof item === 'string') {
+    items[index] = {
+      task: item,
+      priority: 'medium',
+      owner: 'Global',
+      deadline: '',
+      status: 'completed'
+    };
+  } else {
+    items[index] = {
+      ...item,
+      status: item.status === 'completed' ? 'pending' : 'completed'
+    };
+  }
+
+  // Calculate new progress percentage: (completed items / total items) * 100
+  const total = items.length;
+  const completed = items.filter(x => x.status === 'completed').length;
+  const newProgress = total > 0 ? Math.round((completed / total) * 100) : activeEntry.value.progress;
+
+  // Optimistic UI updates
+  activeEntry.value.action_items = items;
+  activeEntry.value.progress = newProgress;
+
+  try {
+    // Save to server
+    await api.put(`/voices/${activeEntry.value.id}`, {
+      action_items: items,
+      progress: newProgress
+    });
+    notificationStore.addNotification('Đã cập nhật tiến độ công việc!');
+  } catch (err) {
+    console.error('Failed to update action item status:', err);
+    notificationStore.addNotification('Không thể lưu tiến độ công việc', 'error');
   }
 };
 </script>

@@ -4,7 +4,7 @@ import api from '../lib/axios';
 
 export const useConfigStore = defineStore('config', () => {
     const apiKeys = ref([]);
-    const activeModel = ref('gemini-2.5-flash');
+    const activeModel = ref('gemini-3.5-flash');
     const loading = ref(false);
 
     const activeKeyIndex = ref(0);
@@ -14,7 +14,7 @@ export const useConfigStore = defineStore('config', () => {
         try {
             const response = await api.get('/ai-config');
             apiKeys.value = response.data.gemini_api_keys || [];
-            activeModel.value = response.data.gemini_model || 'gemini-2.5-flash';
+            activeModel.value = response.data.gemini_model || 'gemini-3.5-flash';
             // Reset index on fetch
             activeKeyIndex.value = 0;
         } catch (error) {

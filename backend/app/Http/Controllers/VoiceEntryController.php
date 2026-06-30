@@ -27,7 +27,7 @@ class VoiceEntryController extends Controller
 
     public function store(Request $request)
     {
-        set_time_limit(120);
+        set_time_limit(360); // Allow up to 6 minutes for large audio files
 
         // CHI TIẾT LOG ĐỂ DEBUG
         Log::info('Entry Request Data:', [
@@ -117,7 +117,7 @@ class VoiceEntryController extends Controller
                     $apiKey = !empty($dbKeys) ? $dbKeys[0] : $request->header('X-Gemini-Api-Key');
 
                     $dbModel = \App\Models\Config::where('key', 'gemini_model')->first()?->value;
-                    $model = $dbModel ?? $request->header('X-Gemini-Model') ?? 'gemini-2.5-flash';
+                    $model = $dbModel ?? $request->header('X-Gemini-Model') ?? 'gemini-3.5-flash';
 
                     if (!$apiKey) {
                         Log::error('Voice Entry: API Key not found for server-side analysis');
@@ -190,7 +190,9 @@ class VoiceEntryController extends Controller
     public function update(Request $request, VoiceEntry $voice)
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
+            'title'        => 'nullable|string|max:255',
+            'action_items' => 'nullable|array',
+            'progress'     => 'nullable|integer|min:0|max:100',
         ]);
 
         $voice->update($validated);
